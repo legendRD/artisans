@@ -418,3 +418,35 @@ class WxController extends CommonController {
 		}
 		return json_encode($return_data);
   }
+  
+  public function alltimeStatus($date, $moduleId, $city, $userId='') {
+	$where = array(
+		'a.startTime' => array('egt', date('Y-m-d 00:00:00', strtotime($date))),
+		'a.endTime'   => array('elt', date('Y-m-d 23:59:59', strtotime($date))),
+		'a.moduleId'  => $moduleId,
+	);
+	if($userId) {
+		$where['a.userId'] = $userId;
+	}
+	if($city) {
+		$where['b.city']   = $city;
+	}
+	$reservation_time = M()->table('wx_artisans_user_baseinfo as b')
+			       ->join('wx_artisans_time_price as a on a.userId = b.id')
+			       ->where($where)
+			       ->group('a.startTime, a.endTime')
+			       ->field('a.startTime as startTime, a.endTime as endTime, sum(a.`NouseNum`) as totalnum')
+			       ->select();
+	if($rservation_time) {
+		foreach($reservation_time as $row){
+			//可以预约的时间段, 切割的时间点,按一个小时切割
+			if($row['totalnum'] > 0) {
+				$target = true;
+				$i = 0;
+				while($target) {
+					
+				}
+			}
+		}
+	}
+  }
