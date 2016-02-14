@@ -444,9 +444,346 @@ class WxController extends CommonController {
 				$target = true;
 				$i = 0;
 				while($target) {
-					
+					$tmp_time = strtotime($row['startTime'] + 3600*$i)
+					if($tmp_time > strtotime($tow['endTime'])) {
+						$target = false;
+					}else{
+						$use_time[] = $tmp_time;
+						$i++;
+					}
 				}
 			}
 		}
+		
+		//寻找丢失的时间点
+		$mintime = strtotime(date('Y-m-d 10:00:00', strtotime($date)));
+		for($i=0;$i<12;$i++) {
+			$tmp_time = $mintime + 3600*$i;
+			//3小时之后
+			if(in_array($tmp_time, $user_time) && ($tmp_time-time()>10800)) {
+				$num_arr[] = 1;
+			}else{
+				$num_arr[] = 0;
+			}
+		}
+	}else{
+		$num_arr = array(0,0,0,0,0,0,0,0,0,0,0,0);
 	}
+	return $num_arr;
+  }
+  
+  //ajax 预约时间临时表
+  public function choosetimetmp() {
+  	$postDate = I('post.', '', 'sql_filter');
+  	$day_arr  = explode('周', $postData['day']);
+  	$data['moduleId'] = $postData['moduleId'];
+  	$data['openId']	  = $postData['user_id'];
+  	$data['reservationTime'] = date('Y-m-d H:i:s', strtotime($day_arr[0].' '.trim($postData['time']).':00'));
+  	$data['address']  = $postData['address'];
+  	$data['lat']	  = $postData['lat'];
+  	$data['lng']	  = $postData['lng'];
+  	$data['cdate']	  = date('Y-m-d H:i:s');
+  	//为朋友预约
+  	$data['type']	  = (int)$postData['type'];
+  	//判断该城市是否开通了该技能
+  	$city = str_replace('市','',$postData['city']);
+  	$moduleIdStr = M('artisans_city')->where(array('city'=>$city, 'status'=>1))->getField('moduleIdStr');
+  	if(strpos($moduleIdStr, $data['moduleId']) === false) {
+  		$returnData = array('status'=>300, 'errormsg'=>'亲，您所选择的地址，所在城市还未开通服务，敬请期待。');
+  		return json_encode($returnData);
+  	}
+  	
+  	if(empty($data['type'])||$data['type']=='0') {
+  		$id = M('artisans_reservation_log')->add($data);
+  		if($id) {
+  			$returnData = array('status'=>200, 'tableid'=>0);
+  		}else{
+  			$returnData = array('status'=>0);
+  		}
+  		return json_encode($returnData);
+  	}elseif($data['type'] == 1) {
+  		//ajax 为朋友预约时间临时表
+  		$data['friendName']    = $postData['name'];
+  		$data['friendPhone']   = $postData['phone'];
+  		$data['detailAddress'] = $postData['addressdetail'];
+  		$data['shortmessage']  = $postData['wish'];
+  		$data['way']	       = '上门';
+  		$id = M('artisans_reservation_log')->add($data);
+  		if($id) {
+  			$returnData = array('status'=>200, 'tableid'=>$id);
+  		}else{
+  			$returnData = array('status'=>0);
+  		}
+  		return json_encode($returnData);
+  	}
+  }
+  
+  //ajax 预约时间临时表
+  public function chooseArtisanstmp() {
+  	$postData = I('post.', '', 'sql_filter');
+  	$data['moduleId'] = $postData['moduleId'];
+  	$data['openId']   = $postData['user_id'];
+  	$data['reservationTime'] = date('Y-m-d H:i:s', strtotime(trim($postData['day']).' '.trim($postData['time']).':00'));
+  	$data['address']  = $postData['address'];
+  	$data['lat']	  = $postData['lat'];
+  	$data['lng']	  = $postData['lng'];
+  	$data['userId']   = $postData['userId'];
+  	$data['cdate']	  = date('Y-m-d H:i:s');
+  	$source 	  = $postData['source'];
+  	if($source == 100) {
+  		$data['type'] = 1;
+  	}
+  	$status = true;
+  	if($status) {
+  		$id = M('artisans_reservation_log')->add($data);
+  	}
+  	if($id) {
+  		$returnData = array('status'=>200, 'tableid'=>$id);
+  	}else{
+  		$returnData = array('status'=>0);
+  	}
+  	return json_encode($returnData);
+  }
+	
+  //列表页
+  public function systemList() {
+  	$getData = I('get.', '', 'sql_filter');
+  	$get['moduleId'] = $moduleId = $getData['moduleId'];
+  	$day_arr = explode('周', $getData['day']);
+  	$get['time'] = $time = date('Y-m-d H:i:s', strtotime($day_arr[0].' '.trim($getData['time'].':00')));
+  	$get['lat']  = $lat  = $getData['lat'];
+  	$get['lng']  = $lng  = $getData['lng'];
+  	$get['user_id'] = $getData['user_id'];
+	$get['type'] 	= $getData['type'];
+	$get['tableid'] = $getData['tableid'];
+	$get['city'] 	= $getData['city'];
+	
+	$this->assign('get', $get);
+	$this->assign('openId', $get['user_id']);
+	$this->assign('pageHome', 'craftsSystemList');
+	
+	$this->display('qcs_list_spa');
+  }
+  
+  //ajax 列表页
+  public function ajsystemList(){
+  	$postData = I('post.','','sql_filter');
+  	$type     = $postData['type']?$postData['type']:0;	//0综合排序，1距离，2人气，3价格
+  	$page	  = $postData['page']>0?$postData['page']:1;	//当前页
+  	$per_page = $postData['per_page']?$postData['per_page']:10;	//显示条数
+  	$moduleId = $postData['moduleId'];
+  	$time 	  = $postData['time'];
+  	$lat	  = $postData['lat'];
+  	$lng	  = $postData['lng'];
+  	$limit_start = ($page-1)*$per_page;
+  	$limit_end   = $page*$per_page;
+  	$openid   = $postData['user_id'];
+  	$selecttype  = $postData['selecttype'];	//位自己预约还是为朋友预约
+  	$city     = $postData['city'];
+  	$city     = str_replace('市','',$city);
+  	//获取该模快基础价
+  	$baseinfo = M('artisans_modules')->where(array('id'=>$moduleId))->find();
+	$ttime = date('Y-m-d H:i:s');
+	if($baseinfo['startTime']<=$ttime && $baseinfo['endTime'] >= $ttime){
+		$basePrice = $baseinfo['endPrice'];
+	}else{
+		$basePrice = $baseinfo['price'];
+	}
+  	$where = array(
+  		'b.moduleId' => $moduleId,
+  		'a.city'     => $city,
+  	);
+  	$userInfo = M()->table('wx_artisans_user_baseinfo as a')
+  		       ->join('wx_artisans_modules_user as b on a.id = b.userId')
+  		       ->where($where)
+  		       ->field('distinct a.`id` as userId, userName, trueName, headImg, source, lat, lng, a.goodRate as goodRate, a.serviceNum as serviceNum')->select();
+  	if($userInfo) {
+  		foreach($userInfo as $value) {
+  			$tmp_where = array(
+  				'moduleId' => $moduleId,
+  				'userId'   => $value['userId'],
+  				'startTime'=> array('elt', $time),
+  				'endTime'  => array('egt', $time),
+  			);
+  			$tmp = M('artisans_time_price')->where($tmp_where)->field('startTime, endTime, price, status, nouseNum')->find();
+  			$value['startTime'] = $tmp['startTime'];
+  			$value['endTime']   = $tmp['endTime'];
+  			$value['price']     = $tmp['price']>0? $tmp['price']:0;
+  			$value['status']    = $tmp['status']>0?1:0;
+  			$value['nouseNum']  = $tmp['nouseNum']>0?$tmp['nouseNum']:0;
+  			$jsondata['name']   = $value['trueName'];
+  			$jsondata['avatar'] = $value['headImg'];
+  			$jsondata['school'] = $value['source'];
+  			$jsondata['goodRate'] = $value['goodRate'];
+  			$jsondata['good']   = $value['goodRate'].'%';
+  			$jsondata['distance_s'] = ceil(round($this->getDistance($lat, $lng, $value['lat'], $value['lng']), 1));
+  			//距离格式
+  			$dis_where = array(
+  				'moduleId'=>$moduleId,
+  				'userId'  =>$value['userId'],
+  				'minDistance'=>array('elt', $jsondata['distance_s']),
+  				'maxDistance'=>array('egt', $jsondata['distance_s']),
+  				'status'=>1
+  			);
+  			$price = $jsondata['distance_s']*2;
+  			if($baseinfo['startTime']<=$ttime && $baseinfo['endTime']>=$ttime) {
+  				$discount = $baseinfo['discount']/10;
+  				$jsondata['my_msg'] = "(原价￥".$baseinfo['price']."元)";
+  			}else{
+  				$josndata['my_msg'] = "(上门费￥".$price.")";
+  			}
+  			$distance_price = M('artisans_distance_price')->where($dis_where)->getField('price');
+  			$distance_price = $distance_price>0? $distance_price:0;
+  			//时间价
+  			if($value['status'] == 1) {
+  				$time_price = $value['price'];
+  			}else{
+  				$time_price = 0;
+  			}
+  			//个人加成
+  			$dis_where = array(
+  				'moduleId'=>$moduleId,
+  				'userId'  =>$value['userId'],
+  				'status'  =>1
+  			);
+  			$tip_price = M('artisans_tip_price')->where($dis_where)->getField('price');
+			$tip_price = $tip_price>0? $tip_price:0;
+			//标准价 = 基础价+时间价+距离价+加成价
+			$jsondata['price_s'] = $basePrice + $distance_price + $time_price + $tip_price;
+			$jsondata['price'] = $jsondata['price_s'];
+			$jsondata['distancePrice'] = sprintf("%02.2f",$distance_price);
+			$jsondata['distance'] = $jsondata['distance_s'];
+			//服务过的单数
+			$jsondata['ordered'] = $value['serviceNum']>0? (int)$value['serviceNum']:50;
+			if(empty($selecttype)) {
+				$jsondata['url'] = U('Craft/systemDetail')."?user_id=".$openid."&moduleId=".$moduleId."&userId=".$value['userId']."&price=".$jsondata['price_s']."&distanceprice=".$distance_price."&ordernum=".$jsondata['ordered']."&distance=".$jsondata['distance_s'];	//详情页	
+			}else{
+				$jsondata['url'] = U('Craft/systemDetail')."?source=100&tableid=".$postData['tableid']."&user_id=".$openid."&moduleId=".$moduleId."&userId=".$value['userId']."&price=".$jsondata['price_s']."&distanceprice=".$distance_price."&ordernum=".$jsondata['ordered']."&distance=".$jsondata['distance_s']; //详情页
+			}
+			$jsondata['choose_url'] = U('Craft/submitUserinfo').'?openid='.$openid.'&moduleId='.$moduleId.'&userId='.$value['userId'].'&source_type=1&price='.$jsondata['price_s']; //填写信息页
+			if($value['nouseNum']>0 && (strtotime($value['endTime'])-time()) > 10800) {
+				$jsondata['disabled'] = 'able';
+				$jsondata['btntxt']   = '约TA';
+				$chooseGoodrate[]     = $value['goodRate'];
+				$choosePrice[]	      = $jsondata['price_s'];
+				$chooseDistance[]     = $jsondata['distance_s'];
+				$chooseHot[]	      = $jsondata['ordered'];
+				$chooseInfo[]	      = $jsondata;
+			}else{
+				$jsondata['choose_url'] = 'javascript:void(0)';
+				$jsondata['disabled']   = 'disable';
+				$jsondata['btntxt']	= '约满';
+				$nochooseGoodrate[]	= $value['goodRate'];
+				$nochoosePrice[]	= $jsondata['price_s'];
+				$nochooseDistance[]	= $jsondata['distance_s'];
+				$nochooseHot[]		= $jsondata['ordered'];
+				$nochooseInfo[]		= $jsondata;
+			}
+  		}
+  		if($type == 1){
+  			//按距离 好评率
+  			array_multisort($chooseDistance, SORT_ASC, SORT_NUMERIC, $chooseGoodrate, SORT_DESC, SORT_NUMERIC, $chooseInfo);
+  			array_multisort($nochooseDistance, SORT_ASC, SORT_NUMERIC, $nochooseGoodrate, SORT_DESC, SORT_NUMERIC, $nochooseInfo);
+  		}elseif($type == 2){
+  			//按人气 好评率
+  			array_multisort($chooseHot, SORT_DESC, SORT_NUMERIC, $chooseGoodrate, SORT_DESC, SORT_NUMERIC, $chooseInfo);
+  			array_multisort($nochooseHot, SORT_DESC, SORT_NUMERIC, $nochooseGoodrate, SORT_DESC, SORT_NUMERIC, $nochooseInfo);
+  		}elseif($type == 3){
+  			//按价格 好评率
+  			array_multisort($choosePrice, SORT_ASC, SORT_NUMERIC, $chooseGoodrate, SORT_DESC, SORT_NUMERIC, $chooseInfo);
+  			array_multisort($nochoosePrice, SORT_ASC, SORT_NUMERIC, $nochooseGoodrate, SORT_DESCm SORT_NUMERIC, $nochooseInfo);
+  		}else{
+  			//综合排序	1.好评率 降序  2，价格升序
+  			array_multisort($chooseDistance, SORT_ASC, SORT_NUMERIC, $chooseGoodrate, SORT_DESC, SORT_NUMERIC, $chooseInfo);
+  			array_multisort($nochooseDistance, SORT_ASC, SORT_NUMERIC, $nochooseGoodrate, SORT_DESC, SORT_NUMERIC, $nochooseInfo);
+  		}
+  		$Info = array_merge((array)$chooseInfo, (array)$nochooseInfo);
+  		//取数
+  		$totalnum = count($Info);
+  		for($limit_start;($limit_start<$limit_end && $limit_start<=$totalnum-1);$limit_start++) {
+  			$data[] = $Info[$limit_start];
+  		}
+  		if($data){
+  			return json_encode(array('status'=>200, 'data'=>$data));
+  		}eles{
+  			return json_encode(array('status'=>0));
+  		}
+  	}else{
+  		return json_encode(array('status'=>0));
+  	} 
+  }
+  
+  //为朋友预约支付页
+  public function forfriendpay() {
+  	$getData = I('get.', '', 'sql_filter');
+  	$getinfo = 'userId='.$getData['userId'].'**source='.$getData['source'].'**tableid='.$getData['tableid'];
+  	if(I("code")) {
+  		$code = I("code");
+  		$shop = D("WeiXinApi");
+  		$userinfo = $shop->getOAuthAccessToken($code);
+  		$openid = $userinfo["openid"];
+  	}else{
+  		if(C('ProductStatus')===false){
+  			$openid = $this->reGetOAuthDebug("/weixin/index.php/shop/wxceshi_forfriendpay?getinfo=".$getinfo);
+  		}else{
+  			$openid = $this->reGetOAuthDebug("/weixin/index.php/shop/shouyi_forfriendpay?getinfo=".$getinfo);
+  		}
+  	}
+  	if(APP_DEBUG) {
+  		$userId = $getData['userId'];
+  		$source = $getData['source'];
+  		$tableId = $getData['tableid'];
+  	}else{
+  		$getinfo = I('get.getinfo', '', 'sql_filter');
+  		$getinfo = explode('**', $getinfo);
+  		foreach($getinfo as $key=>$value) {
+  			$tmp = array();
+  			$tmp = explode('=', $value);
+  			if($tmp[0] == 'userId') {
+  				$userId = $tmp[1];
+  			}elseif($tmp[0] == 'source') {
+  				$source = $tmp[1];
+  			}elseif($tmp[0] == 'tableid') {
+  				$tableId = $tmp[1];
+  			}
+  		}
+  	}
+  	$log_where = array(
+  		'id'=>$tableId,
+  		'openId'=>$openid,
+  		'type'=>1,
+  	);
+  	$reservation_log = M('artisans_reservation_log')->where($log_where)->find();
+  	$getData['moduleId'] = $reservation_log['moduleId'];
+  	$getData['type']     = 1;	//默认为1
+  	if($reservation_log['id']) {
+  		//添加到submitinfo
+  		$data['moduleId'] = $reservation_log['moduleId'];
+  		$data['openId']   = $reservation_log['openId'];
+  		$data['reservationTime'] = $reservation_log['reservationTime'];
+  		$data['address'] = $reservation_log['address'];
+		$data['cdate'] = date('Y-m-d H:i:s');
+		$data['type'] = 1;
+		$data['shortmessage'] = $reservation_log['shortmessage'];
+		$data['friendPhone'] = $reservation_log['friendPhone'];
+		$data['friendName'] = $reservation_log['friendName'];
+		$data['detailAddress'] = $reservation_log['detailAddress'];
+		$data['way'] = $reservation_log['way'];
+		if($source == 100){
+			$data['userId'] = $userId;
+		}else{
+			$data['userId'] = $reservation_log['userId'];
+		}
+		//以下为价格计算
+		$artisansInfo = M('artisans_user_baseinfo')->where(array('id'=>$data['userId']))->find();
+		//模块基础价
+		$baseinfo = M('artisans_modules')->where(array('id'=>$reservation_log['moduleId']))->find();
+		$ttime = date('Y-m-d H:i:s');
+		if($baseinfo['startTime']<=$ttime && $baseinfo['endTime'] >= $ttime) {
+			$basePrice = $baseinfo['endPrice'];
+		}else{
+			$basePrice = $baseinfo['price'];
+		}
+		$jsondata['distance_s'] = round($this->getDistance($reservation_log['lat'],$reservation_log['lng'],$artisansInfo['lat'],$artisansInfo['lng']));
+  	}
   }
