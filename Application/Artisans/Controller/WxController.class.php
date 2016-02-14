@@ -785,5 +785,216 @@ class WxController extends CommonController {
 			$basePrice = $baseinfo['price'];
 		}
 		$jsondata['distance_s'] = round($this->getDistance($reservation_log['lat'],$reservation_log['lng'],$artisansInfo['lat'],$artisansInfo['lng']));
+			//距离价格
+			$dis_where = array(
+					'moduleId'=>$reservation_log['moduleId'],
+					'userId'=>$data['userId'],
+					'minDistance'=>array('elt',$jsondata['distance_s']),
+					'maxDistance'=>array('egt',$jsondata['distance_s']),
+					'status'=>1
+			);
+			$distance_price = M('artisans_distance_price')->where($dis_where)->getField('price');
+			$distance_price = $distance_price>0? $distance_price:0;
+			
+			//时间价
+			$time_where = array(
+					'moduleId'=>$reservation_log['moduleId'],
+					'userId'=>$data['userId'],
+					'startTime'=>array('elt',$reservation_log['reservationTime']),
+					'endTime'=>array('egt',$reservation_log['reservationTime']),
+					'status'=>1
+			);
+		$time_price = M('artisans_distance_price')->where($time_where)->getField('price');
+		$time_price = $time_price>0? $time_price:0;
+		//个人加成
+			$dis_where = array(
+					'moduleId'=>$reservation_log['moduleId'],
+					'userId'=>$data['userId'],
+					'status'=>1
+			);
+			$tip_price = M('artisans_tip_price')->where($dis_where)->getField('price');
+			$tip_price = $tip_price>0? $tip_price:0;
+		//标准价 = 基础价+时间价+距离价+加成价
+		$price = $basePrice + $distance_price + $time_price + $tip_price;
+		$data['price'] = $price;
+		$id = M('artisans_submitinfo')->add($data);
+		if($id) {
+			//支付需要的参数
+			$conf['appid'] = C("APPID");
+			$conf['partnerkey'] = C("PARTNERKEY");
+			$conf['partnerid']  = C("PARTNERID");
+			$conf['appkey']	    = C("PAYSIGNKEY");
+			$cardinfo['money']  = 0;
+			$cardinfo['cardid'] = '';
+			$cardinfo_status    = false;
+			//获取价格
+			$cardid = $this->_cardid[$data['moduleId']];
+			if($cardid) {
+				$getcard_artisans_url  = $this->_artisans_url.$cardid.'&openid='.$openid;
+				$getcard_artisans_info = send_get_curl($getcard_artisans_url);
+				$getcard_artisans_info = json_decode($getcard_artisans_info, true);
+				$today = date('Y-m-d H:i:s');
+				if($getcard_artisans_info['error_code'] === 0) {
+					if($getcard_artisans_info['data']['card']['start_time']<$today && $getcard_artisans_info['data']['card']['end_time']>$today 
+					   && 
+					   $getcard_artisans_info['data']['card']['state'] == 100 
+					   &&
+					   $getcard_artisans_info['data']['card_codes'][0]['cost_count'] === "0") {
+					   	$cardinfo['money'] = $price;
+					   	$cardinfo['cardid'] = '111';
+					   	$cardinfo_status = true;
+					   }
+				}
+			}
+			if($cardinfo_status) {
+				if($type == 2) {
+					$price = $tipInfo['package1'];
+				}elseif($type == 3) {
+					$price = $tipInfo['package2'];
+				}
+			}
+			
+			$this->assign('cardinfo', $cardinfo);
+			$this->assign('openid',$openid);
+			$this->assign('price',$price);
+			$this->assign('getData',$getData);
+			$this->assign('conf',$conf);
+		}
   	}
+  	$this->assign('openId',$openid);
+  	$this->assign('pageHome','craftSelectCard');
+	
+  	$this->display('qcs_choose_card2');
   }
+  
+  public function systemDetail() {
+  	$getData = I('get.','','sql_filter');
+	$moduleId = $getData['moduleId'];
+	$userId = $getData['userId'];
+	$openid = $getData['user_id'];
+	//显示日期，显示最近12天
+	$date_arr = $this->showweek();
+	//切割当天的时间点
+	$time_s = array('10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00');
+	//微信用于选择的时间
+	$selectTimeInfo = M('artisans_reservation_log')->where(array('openId'=>$openid,'moduleId'=>$moduleId))
+						       ->order('cdate desc')
+						       ->find();
+	$activeDay = (strtotime(date('Y-m-d 00:00:00', strtotime($selectTimeInfo['reservationTime']))) - strtotime(date('Y-m-d 00:00:00')))/86400;
+	$active['activeDay'] = $activeDay >= 0?(int)$activeDay:0;
+	$activeTime = array_filp($time_s)[date('H:i', strtotime($selectTimeInfo['reservationTime']))];
+	$active['activeTime'] = $activeTime >= 0?(int)$activeTime:0;
+	$active['lat'] =  $selectTimeInfo['lat'];
+	$active['lng'] =  $selectTimeInfo['lng'];		
+	$active['address'] =  $selectTimeInfo['address'];
+	$artisansInfo = M('artisans_user_baseinfo')->where(array('id'=>$userId))->find();
+	$artisansInfo['price_i'] = $getData['price'];
+	$artisansInfo['price']   = $getData['price'];
+	$artisansInfo['distancePrice'] = sprintf("%02.2f", $getData['distanceprice']);
+	$artisansInfo['distance_txt']  = $getData['distance'].'公里';
+	$artisansInfo['good']	       = $artisansInfo['goodRate'].'%';
+	$artisansInfo['ordernum']      = $getData['ordernum'];
+	$baseinfo = M('artisans_modules')->where(array('id'=>$moduleId))->find();
+	$ttime = date('Y-m-d H:i:s');
+	if($baseinfo['startTime']<=$ttime && $baseinfo['endTime'] >= $ttime) {
+		$basePrice = $baseinfo['endPrice'];
+		$discount  = $baseinfo['discount']/10;
+		$del	   = "(原价￥".$baseinfo['price']."元)";
+	}else{
+		$basePrice = $baseinfo['price'];
+		$distance_price=$getData['distance']*2;
+		$del="(上门费￥".$distance_price.")";
+	}
+	
+	//获取拥有的技能
+	$res=M('artisans_modules_user')->where(array('userId'=>$userId))->select();
+	foreach($res as $key=>$value) {
+		$res[$key]['img'] = M('artisans_modules')->find($value['moduleId'])['classImg'];
+	}
+	
+	$this->assign('module',$res);
+	$this->assign('del',$del);
+	$this->assign('del_price',$basePrice);
+	$this->assign('userInfo',$artisansInfo);
+	$this->assign('get',$getData);
+	$this->assign('active',$active);
+	$this->assign('user_id',$openid);
+	$this->assign('openId',$openid);
+	$this->assign('date_arr', json_encode($date_arr));
+	$this->assign('time_arr', json_encode($time_s));
+	$this->assign('pageHome','craftDetail');
+	
+	$this->display('qcs_detail');
+  }
+  
+  //点评数据 ajax
+  public function getcomments() {
+  	$postData = I('post.','','sql_filter');
+  	$where = array(
+		'userId'=>$postData['userId'],
+	);
+	$postData['start'] = $postData['start']>0?$postData['start']:1;
+	$postData['limit'] = $postData['limit']>0?$postData['limit']:5;
+	$startnum = ($postData['start']-1)*$postData['limit'];
+	$endnum = $postData['limit'];
+	//用户点评数据
+	$comments = M('artisans_comments')->where($where)
+					  ->field('headImg as photo,nums as star,cdate as time,comments as text,name')
+					  ->order('cdate desc')
+					  ->limit("{$startnum}, {$endnum}")
+					  ->select();
+	if($comments) {
+		$comment_arr = array('status'=>200, 'data'=>$comments);
+	}else{
+		$comment_arr = array('status'=>0);
+	}
+	return json_encode($comment_arr);
+  }
+  
+  public function submitUserinfo() {
+  	
+  }
+  
+  public function createInfo() {
+  	
+  }
+  
+  //选择卡卷页
+  public function selectCard() {
+  	
+  }
+  
+  public function systempay() {
+	$this->display('qcs_have_card');
+  }
+  
+  //支付成功页
+  public function successPay() {
+  	
+  }
+
+  //更新订单状态
+  public function notice() {
+  	
+  }
+  
+  //查看订单支付状态是否更新成为成功
+  public function updateOrder() {
+  	
+  }
+  
+  //查询微信那边是否生成成功订单的信息
+  public function findwxorder() {
+  	
+  }
+  
+  //核销卡卷
+  public function cleanQ($openid, $moduleId) {
+  	
+  }
+  
+  public function cleanKQ($openid,$cardid,$codeid) {
+  
+  }
+  
+  //推送消息
