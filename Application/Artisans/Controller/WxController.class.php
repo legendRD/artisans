@@ -1788,4 +1788,37 @@ class WxController extends CommonController {
 		$this->display('qcs_failed');
 	}
 	
-	
+	/**
+	 *订单查询接口
+	 */
+	public function orderQueryApi($out_trade_no) {
+		//这里只需要获取一个out_trade_no来完成
+		$appid = C("APPID");//appid
+		$partner = C("PARTNERID");//商户号
+		$partnerkey = C("PARTNERKEY");//商户key
+		$appkey = C("PAYSIGNKEY");//支付签名pagsignkey
+		//生成sign签名
+		$con_str = "out_trade_no=".$out_trade_no."&partner=".$partner."&key=".$partnerkey;
+		$sign = strtoupper(md5($con_str));
+		//生成package签名
+		$package = "out_trade_no=".$out_trade_no."&partner=".$partner."&sign=".$sign ;
+		//获取linux时间戳
+		$timestamp = time();
+		//生成app_signature签名
+		$con_str ="appid=$appid&appkey=$appkey&package=$package&timestamp=$timestamp";
+		$app_signature = sha1($con_str);
+		//组装订单查询的参数
+		$post_array = array();
+		$post_array['appid'] = $appid;
+		$post_array['package'] = $package;
+		$post_array['timestamp'] = $timestamp;
+		$post_array['app_signature'] = $app_signature;
+		$post_array['sign_method'] = "sha1";
+		//对该数组进行Json_encode编码
+		$post_data = json_encode($post_array);
+		//订单查询的接口
+		$url = "https://api.weixin.qq.com/pay/orderquery?access_token=" . $this->token;
+		$ret =  send_curl ( $url, $post_data, C('PROXY'));
+		//分析订单的查询结果
+		return  json_decode($ret,true);
+	}
