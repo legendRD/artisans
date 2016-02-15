@@ -952,16 +952,373 @@ class WxController extends CommonController {
   }
   
   public function submitUserinfo() {
+  	$getData = I('get.','','sql_filter');
+  	$getinfo = 'moduleId='.$getData['moduleId'].'**source_type='.$getData['source_type'].'**userId='.$getData['userId'];
+  	$appid	 = C("APP_ID");
+  	$this->appid = $appid;
   	
+  	if(I("code")) {
+  		$code = I("code");
+  		$shop = D("WeiXinApi");
+  		$userinfo = $shop->getOAuthAccessToken($code);
+  		$openid = $userinfo['openid'];
+  	}else{
+  		$openid = $this->reGetOAuthDebug(U("Craft/submitUserinfo").'?getinfo='.$getinfo);
+  	}
+  	if(APP_DEBUG) {
+  		$moduleId = $getData['moduleId'];
+  		$source_type = $getData['source_type'];
+  		$userId = $getData['userId'];
+  	}else{
+  		$getinfo = I('get.getinfo','','sql_filter');
+  		$getinfo = explode('**', $getinfo);
+  		foreach($getinfo as $key=>$value) {
+  			$tmp = explode('=', $value);
+  			if($key == 0) {
+  				$moduleId = $tmp[1];
+  			}elseif($key == 1) {
+  				$source_type = $tmp[1];
+  			}elseif($key == 2) {
+  				$userId = $tmp[1];
+  			}
+  		}
+  	}
+  	$where = array(
+  		'openId'=>$openid,
+  		'moduleId'=>$moduleId,
+  	);
+  	if($source_type == 1) {
+  		$where['userId'] = 0;
+  	}else{
+  		$where['userId'] = $userId;
+  	}
+  	$ordertimeInfo = M('artisans_reservation_log')->where($where)->order('cdate desc')->find();
+	$ordertimeInfo['userId'] = $userId;
+	$artisansInfo = M('artisans_user_baseinfo')->where(array('id'=>$userId))->find();
+	//模块基础价
+	$baseinfo = M('artisans_modules')->where(array('id'=>$moduleId))->find();
+	$ttime = date('Y-m-d H:i:s');
+	if($baseinfo['startTime']<=$ttime && $baseinfo['endTime'] >= $ttime){
+		$basePrice = $baseinfo['endPrice'];
+	}else{
+		$basePrice = $baseinfo['price'];
+	}
+	$jsondata['distance_s'] = round($this->getDistance($ordertimeInfo['lat'], $ordertimeInfo['lng'], $artisansInfo['lat'], $artisansInfo['lng']));
+  	//距离价格
+  	$dis_where = array(
+  		'moduleId'=>$moduleId,
+  		'userId'=>$userId,
+  		'minDistance'=>array('elt', $jsondata['distance_s']),
+  		'maxDistance'=>array('egt', $jsondata['distance_s']),
+  		'status'=>1
+  	);
+  	$distance_price = M('artisans_distance_price')->where($dis_where)->getField('price');
+	$distance_price = $distance_price>0? $distance_price:0;
+	//时间价
+	$time_where = array(
+		'moduleId'=>$moduleId,
+		'userId'=>$userId,
+		'startTime'=>array('elt', $ordertimeInfo['reservationTime']),
+		'endTime'=>array('egt', $ordertimeInfo['reservationTime']),
+		'status'=>1
+	);
+	$time_price = M('artisans_distance_price')->where($time_where)->getField('price');
+	$time_price = $time_price>0? $time_price:0;
+	//个人加成
+	$dis_where = array(
+		'moduleId'=>$moduleId,
+		'userId'=>$userId,
+		'status'=>1
+	);
+	$tip_price = M('artisans_tip_price')->where($dis_where)->getField('price');
+	$tip_price = $tip_price>0? $tip_price:0;
+	//标准价 = 基础价+时间价+距离价+加成价
+	$price = $basePrice+$distance_price+$time_price+$tip_price;
+	$ordertimeInfo['price'] = $price;
+	//用户手机号，姓名
+	$wxUserinfo = M("BespokeRepair")->where(array('user_id'=>$openid))->order(' id desc ')->field('user_true_name,mobile')->find();
+  	
+  	$this->assign('wxUserinfo',$wxUserinfo);
+	$this->assign('ordertimeInfo',$ordertimeInfo);
+	$this->assign('openId',$openid);
+	$this->assign('pageHome','craftSubmitOrder');
+	
+	$this->display('qcs_sbmit_order');
   }
   
   public function createInfo() {
-  	
+  	$postData = I('post.','','sql_filter');
+	$target = 200;		
+	$data['type'] = $postData['type']==1? 1:0;
+	if($postData['type'] == 1) {
+			$data['moduleId'] = $postData['moduleId'];
+			$data['openId'] = $postData['user_id'];
+			$data['userId'] = $postData['userId'];
+			$data['reservationTime'] = $postData['time'];
+			$data['address'] = $postData['address_s'];
+			$data['detailAddress'] = $postData['address'];
+			$data['friendName'] = trim($postData['name']);
+			$data['friendPhone'] = trim($postData['telephone']);
+			$data['price'] = $postData['price'];
+			$data['way'] = $postData['way'];
+			$data['cdate'] = date('Y-m-d H:i:s');
+			$data['shortmessage'] = $postData['wish'];	
+	}else{
+			$data['moduleId'] = $postData['moduleId'];
+			$data['openId'] = $postData['user_id'];
+			$data['userId'] = $postData['userId'];
+			$data['reservationTime'] = $postData['time'];
+			$data['address'] = trim($postData['address']);
+			$data['name'] = trim($postData['name']);
+			$data['phone'] = trim($postData['telephone']);
+			$data['price'] = $postData['price'];
+			$data['cdate'] = date('Y-m-d H:i:s');
+	}
+	$id = M('artisans_submitinfo')->add($data);
+	if(!$id) {
+		$target = 0;
+	}
+	return json_encode(array('status'=>$target));
   }
   
   //选择卡卷页
   public function selectCard() {
+  	$getData = I('get.','','sql_filter');
+  	if($getData['getinfo']) {
+  		$getinfo = $getData['getinfo'];
+  	}else{
+  		$getinfo = 'moduleId='.$getData['moduleId'].'**type='.$getData['type'];
+  	}
+  	if($getData['redid']) {
+  		$getinfo .= '**redid='.$getData['redid'];
+  	}
+  	if($getData['cardid']) {
+  		$getinfo .= '**cardid='.$getData['cardid'];
+  		$getinfo .= '**codeid='.$getData['codeid'];
+  	}
+  	$appid = C("APP_ID");
+  	$this->appid = $appid;
+  	if(I("code")) {
+  		$code = I("code");
+  		$shop = D("WeiXinApi");
+  		$userinfo   = $shop->getOAuthAccessToken($code);
+		$openid = $userinfo["openid"];
+  	}else{
+  		if(C('ProductStatus') === false) {
+  			$openid = $this->reGetOAuthDebug("/weixin/index.php/shop/wxceshi_selectCard?getinfo=".$getinfo);
+  		}else{
+  			$openid = $this->reGetOAuthDebug("/weixin/index.php/shop/shouyi_selectCard?getinfo=".$getinfo);
+  		}
+  	}
+  	if(APP_DEBUG && I('get.openid', '', 'sql_filter')) {
+  		$moduleId = $getData['moduleId'];
+  		$type = $getData['type'];
+  	}else{
+  		$getinfo = explode('**',$getinfo);
+  		foreach($getinfo as $key=>$value) {
+  			$tmp = explode('=', $value);
+  			if($tmp[0] == 'moduleId') {
+  				$moduleId = $tmp[1];
+  			}elseif($tmp[0] == 'type') {
+  				$type = $tmp[1];
+  			}elseif($tmp[0] == 'redid') {
+  				$redid = $tmp[1];
+  				unset($getinfo[$key]);
+  			}elseif($tmp[0] == 'codeid') {
+  				$codeid = $tmp[1];
+  				unset($getinfo[$key]);
+  			}elseif($tmp[0] == 'cardid') {
+  				$cardid = $tmp[1];
+  				unset($getinfo[$key]);
+  			}
+  		}
+  	}
   	
+  	$getData['moduleId'] = $moduleId;
+  	$getData['type']     = $type;
+  	$getData['redid']    = $redid;
+  	
+  	//支付需要的参数
+  	$conf['appid']      = C("APPID");
+  	$conf['partnerkey'] = C("PARTNERKEY");
+  	$conf['partnetid']  = C("PARTNERID");
+  	$conf['appkey']	    = C("PAYSIGNKEY");
+  	
+  	//获取价格
+  	$userOrderInfo = M('artisans_submitinfo')->where(array('moduleId'=>$moduleId, 'openId'=>$openid))->order('cdate desc')->find();
+  	$price = $userOrderInfo['price'];
+  	if($redid) {
+  		//通过红包id来找到红包
+  		$redbag = M('artisans_user_redbag')->where(array('to_id'=>$openid))->find($redid);
+  		if($redbag['status']==0) {
+  			$redbag_data = '{name:"代金券", money:"'.$redbag['cash'].'", id:".$redid."}';
+  		}
+  	}else{
+  		$redbag_data = '{name:"卡券", money:0, id:''}';
+  	}
+  	
+  	$cardinfo['money']  = 0;
+  	$cardinfo['cardid'] = '';
+  	$cardinfo_status    = false;
+  	
+  	if($cardid && $codeid) {
+  		$getcard_artisans_url  = $this->_artisans_url.$cardid.'&openid='.$openid;
+  		$getcard_artisans_info = send_get_curl($getcard_artisans_url);
+  		$getcard_artisans_info = json_decode($getcard_artisans_info, true);
+  		$today = date('Y-m-d H:i:s');
+  		if($getcard_artisans_info['error_code'] === 0) {
+  			if($getcard_artisans_info['data']['card']['start_time'] < $today && 
+  			   $getcard_artisans_info['data']['card']['end_time'] > $today && 
+  			   $getcard_artisans_info['data']['card']['state'] == 100 && 
+  			   $getcard_artisans_info['data']['card_codes'][0]['cost_count'] === "0" && 
+  			   $getcard_artisans_info['data']['card_codes'][0]['id'] == $codeid) {
+  			   	$cardinfo['cash'] = $getcard_artisans_info['data']['card']['reduce_cost'];
+  			   	$cardinfo['name'] = $getcard_artisans_info['data']['card']['title'];
+  			   	$redbag_data = '{name:"体验券", money:"'.$cardinfo['cash'].'", id:"'.$cardid.'"}';
+  			   	
+  			   	$this->assign('cardid', $cardid);
+  			   	$this->assign('codeid', $codeid);
+  			   }
+  		}
+  	}
+  	
+  	$getinfo = implode('**', $getinfo);
+  	
+  	$this->assign('getinfo', $getinfo);
+  	$this->assign('redbag_data',$redbag_data);
+	$this->assign('cardinfo',$cardinfo);
+	$this->assign('openid',$openid);
+	$this->assign('price',$price);
+	$this->assign('getData',$getData);
+	$this->assign('conf',$conf);
+	$this->assign('openId',$openid);
+	$this->assign('pageHome','craftSelectCard');
+	
+	$this->display('qcs_choose_card2');
+  }
+  
+  public function createOrderinfo() {
+  	$postData  = I('post.','','sql_filter');
+	$moduleId  = $postData['order_moduleId'];
+	$type      = $postData['order_type'];
+	$openid    = $postData['order_user_id'];
+	$redbag_id = $postData['order_redbag_id'];
+	$cardid    = $postData['order_card_id'];
+	$codeid    = $postData['order_code_id'];
+	$userOrderInfo = M('artisans_submitinfo')->where(array('moduleId'=>$moduleId,'openId'=>$openid))->order('cdate desc')->find();
+	//判断这个时间点是否有
+	$time_where = array(
+		'moduleId'=>$moduleId,
+		'startTime'=>array('elt',$userOrderInfo['reservationTime']),
+		'endTime'=>array('egt',$userOrderInfo['reservationTime']),
+		'userId'=>$userOrderInfo['userId'],
+	);
+	$timeInfo = M('artisans_time_price')->where($time_where)->find();
+	if($timeInfo['nouseNum']<1) {
+		$return_data = array('status'=>0,'message'=>'呀！你下手慢了吆，这个点已经被别人约了');
+		return json_encode($return_data);
+	}
+	$price = $userOrderInfo['price'];
+	//判断是不是有卡卷,有卡卷才能使用
+	$today  = date('Y-m-d H:i:s');
+	$getcard_status = false;
+	if($cardid && $codeid) {
+		$data['card_code_id']  = $cardid.'**'.$codeid;
+		$getcard_artisans_url  = $this->_artisans_url.$cardid.'&openid='.$openid;
+		$getcard_artisans_info = send_get_curl($getcard_artisans_url);
+		$getcard_artisans_info = json_decode($getcard_artisans_info, true);
+		if($getcard_artisans_info['error_code'] === 0) {
+			if($getcard_artisans_info['data']['card']['start_time']<$today
+				&& $getcard_artisans_info['data']['card']['end_time']>$today
+				&& $getcard_artisans_info['data']['card']['state']==100
+				&& $getcard_artisans_info['data']['card_codes'][0]['cost_count']==="0"
+				&& $getcard_artisans_info['data']['card_codes'][0]['id']==$codeid
+			) {
+				$getcard_status = true;
+				$cash = $getcard_artisans_info['data']['card']['reduce_cose'];
+				$price = $price-$cash;
+				$price = $price<0?0:$price;
+			}
+		}
+	}
+	
+	$data['price'] = $price;
+	$data['status']= 0;
+	$data['useCardStatus'] = $getcard_status?1:0;
+	$data['moduleId'] = $moduleId;
+	$data['type'] = $type;
+	$data['userId'] = $userOrderInfo['userId'];
+	$data['openId'] = $openid;
+	$data['name'] = $userOrderInfo['name'];
+	$data['reservationTime'] = $userOrderInfo['reservationTime'];
+	$data['address'] = $userOrderInfo['address'];
+	$data['phone'] = $userOrderInfo['phone'];
+	$data['cdate'] = date('Y-m-d H:i:s');
+	$data['moduleName'] = M('artisans_modules')->where(array('id'=>$moduleId))->getField('name');
+	//为朋友预约为start
+	$data['forWho'] = $userOrderInfo['type'];
+	$data['shortmessage'] = $userOrderInfo['shortmessage'];
+	$data['friendPhone'] = $userOrderInfo['friendPhone'];
+	$data['friendName'] = $userOrderInfo['friendName'];
+	$data['detailAddress'] = $userOrderInfo['detailAddress'];
+	$data['way'] = $userOrderInfo['way'];
+	//判断红包是否属于这个人
+	if($redbag_id) {
+		$redbag_info = M('artisans_user_redbag')->where(array('id'=>$redbag_id,'to_id'=>$openid,'status'=>0))->find();
+		$price = $price - $redbag_info['cash'];
+		$price = $price>0?$price:0;
+		$data['price'] = $price;
+	}
+	$data['redbag_id'] = $redbag_id;
+	//为朋友预约end
+	if($price == 0) {
+		$data['status'] = 3;
+	}
+	$id = M('artisans_order')->add($data);
+	if($id) {
+		$data['ordernum'] = $id;
+		if($price == 0) {
+			//核销卡券
+			$this->cleanKQ($openid,$cardid,$codeid);
+			//减1
+			$reduceTimenumid = $this->reduceTimenum($userOrderInfo['userId'],$userOrderInfo['reservationTime'],$moduleId);
+			//更新红包id状态
+			$this->_updateRedbag($redbag_id, $openid, $id);
+			//推送消息
+			$engineerId = M('artisans_user_baseinfo')->where(array('id'=>$userOrderInfo['userId']))->find();
+			$artInfo = array(
+				'artName'=>$engineerId['trueName'],
+				'artPhone'=>$engineerId['phone'],
+				'userName'=>$userOrderInfo['name'],
+				'userPhone'=>$userOrderInfo['phone'],
+				'time'=>$userOrderInfo['reservationTime'],
+				'moduleName'=>$data['moduleName'],
+				'userAddress'=>$userOrderInfo['address'],
+				'ordernum'=>$id,
+				'friendName'=>$userOrderInfo['friendName'],
+				'friendPhone'=>$userOrderInfo['friendPhone'],
+				'shortmessage'=>$userOrderInfo['shortmessage'],
+				'detailAddress'=>$userOrderInfo['detailAddress'],
+				'forWho'=>$userOrderInfo['forWho'],
+			);
+			$this->sendMessage($openid, $engineerId['openId'], $artInfo);
+		}
+		$data['price'] = $price*100;
+		$return_data = array('status'=>200, 'data'=>$data);
+	}else{
+		$return_data = array('status'=>0, 'message'=>'生成订单失败!');
+	}
+	return json_encode($return_data);
+  }
+  
+  private function _updateRedbag($redbag_id, $openid, $id) {
+  	wlog($this->_redbag_log.date('Ymd').'.log','参数:id=>'.$id.',redbag_id=>'.$redbag_id.',openid=>'.$openid, FILE_APPEND);
+  	if($redbag_id && $openid) {
+  		$id = M('artisans_user_redbag')->where(array('to_id'=>$openid,'id'=>$redbag_id))->save(array('status'=>1,'cdate'=>time()));
+  		if(!$id) {
+  			wlog($this->_redbag_log.date('Ymd').'.log','红包状态更新失败:订单号：'.$id.',redbag_id=>'.$redbag_id.',openid=>'.$openid, FIEL_APPEND);
+  		}
+  	}
   }
   
   public function systempay() {
@@ -970,12 +1327,52 @@ class WxController extends CommonController {
   
   //支付成功页
   public function successPay() {
-  	
+  	$getData = I('get.','','sql_filter');
+	$id = $getData['id'];
+	$appid  = C("APP_ID");
+	$this->appid   = $appid;
+	if(I("code")){
+		$code   = I("code");
+		$shop   = D("WeiXinApi");
+		$userinfo   = $shop->getOAuthAccessToken($code);
+		$openid = $userinfo["openid"];
+	}else{
+		$openid = $this->reGetOAuthDebug(U("Craft/successPay").'?id='.$id);
+	}
+	
+	$orderinfo = M('artisans_order')->where(array('id'=>$id,'openId'=>$openid,'status'=>3))->find();
+	$orderinfo['userName'] = M('artisans_user_baseinfo')->where(array('id'=>$orderinfo['userId']))->getField('trueName');
+	$orderinfo['moduleName'] = M('artisans_modules')->where(array('id'=>$orderinfo['moduleId']))->getField('name');
+	
+	$jump_url = 'http://localhost/'.C("TP_PROJECT_NAME").'index.php/Craft/qcsstatus2?openid='.$openid.'&ordernum='.$id.'&role=2';
+	if($orderinfo['forWho'] == 1){
+		$orderinfo['name'] = $orderinfo['friendName'];
+		$orderinfo['phone'] = $orderinfo['friendPhone'];
+		$orderinfo['address'] =$orderinfo['detailAddress'];
+	}
+	
+	$this->assign('openid',$openid);
+	$this->assign('jump_url',$jump_url);
+	$this->assign('orderinfo',$orderinfo);
+	
+	$this->display('qcs_order');
   }
 
   //更新订单状态
   public function notice() {
-  	
+  	$orderParam = I('get.','','sql_filter');
+  	$userParam = $GLOBALS["HTTP_RAW_POST_DATA"];
+  	$dateString = date('Ymd');
+  	//将原始信息存入文件中
+  	file_put_contents($this->pay_log_url.'artisans_original_'.$dateString.'.txt',"#############START:".date('Y-m-d H:i:s'), FILE_APPEND);
+  	file_put_contents($this->pay_log_url.'artisans_original_'.$dateString.'.txt',"*************GET：\r\n'",FILE_APPEND);
+  	file_put_contents($this->pay_log_url.'artisans_original_'.$dateString.'.txt',json_endoce($orderParam)."\r\n", FILE_APPEND);
+  	file_put_contents($this->pay_log_url.'artisans_original_'.$dateString.'.txt',"*************POSTBEGIN\r\n", FILE_APPEND);
+  	file_put_contents($this->pay_log_url.'artisans_original_'.$dateString.'.txt',$userParam."\r\n", FILE_APPEND);
+  	file_put_contents($this->pay_log_url.'artisans_original_'.$dateString.'.txt',"#############END", FILE_APPEND);
+  	//将数据解析后存入表中：wx_payment_userinfo  wx_payment_order
+	//获取支付用户表的字段数组
+	
   }
   
   //查看订单支付状态是否更新成为成功
