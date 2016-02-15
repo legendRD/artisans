@@ -1372,26 +1372,325 @@ class WxController extends CommonController {
   	file_put_contents($this->pay_log_url.'artisans_original_'.$dateString.'.txt',"#############END", FILE_APPEND);
   	//将数据解析后存入表中：wx_payment_userinfo  wx_payment_order
 	//获取支付用户表的字段数组
-	
+	$payment_user_fields     = M('payment_userinfo')->getDbFields();
+	$userinfo = $this->parseXml($userParam, $payment_user_fields);
+	$userinfo['create_time'] = array('exp', 'now()');
+	$userinfo['status']	 = 1;
+	$userinfo_flag		 = M('payment_userinfo')->add($userinfo);
+	//判断是否插入成功
+	if(!$userinfo_flag) {
+		file_put_contents($this->pay_log_url."paymentOrder_fail.txt",date('Y-m-d H:i:s')."--->payment_userinfo:".mysql_error()."--".M("payment_userinfo")->getLastSql()."\r\n", FILE_APPEND);
+	}
+	$orderParam['OpenId']   = $userinfo['OpenId'];
+	$orderParam['create_time']  = array('exp','now()');
+	$orderParam['status']   = 1;
+	$order_flag = M("payment_order")->add($orderParam);
+	if(!$order_flag) {
+		file_put_contents($this->pay_log_url."paymentOrder_fail.txt",date('Y-m-d H:i:s')."--->payment_order:".mysql_error()."--".M("payment_order")->getLastSql()."\r\n", FILE_APPEND);
+	}
+	//更新订单状态及发送消息,其中trade_state为财付通返回，0代表成功
+	$trade_state = true;
+	if($orderParam['trade_state'] == '0') {
+		//该订单支付信息在表中的记录次数
+		$paymentoutcount    = M("payment_order")->where("trade_state='0' and out_trade_no='".$orderParam['out_trade_no']."'")->count();
+		file_put_contents($this->pay_log_url."artisans_cft_log.txt",date('Y-m-d H:i:s')."--->payment_order:".M("payment_order")->getLastSql()."--订单次数count:".$paymentoutcount."\r\n",FILE_APPEND);
+		//只有获取第一次通知记录更新订单状态
+		if($paymentoutcount == 1) {
+			$usershopid = ltrim($orderParam['out_trade_no'],'0');
+			file_put_contents($this->pay_log_url."artisans_cft_log.txt",date('Y-m-d H:i:s')."--->商品订单号:".$usershopid."\r\n",FILE_APPEND);
+			$artisans_order = M('artisans_order')->where('id='.$usershopid)->find();
+			file_put_contents($this->pay_log_url."artisans_cft_log.txt",date('Y-m-d H:i:s')."--->artisans_order:".D("artisans_order")->getLastSql()."\r\n",FILE_APPEND);
+			file_put_contents($this->pay_log_url."artisans_cft_log.txt",date('Y-m-d H:i:s')."--->artisans_order:".json_encode($artisans_order)."\r\n",FILE_APPEND);
+			if($artisans_order) {
+				$data['status'] = 3;
+				$data['udate']  = array('exp','now()');
+				$data['update_by']  = 'notice';
+				//修改用户订单状态为已支付
+				$usershop_res = M("artisans_order")->where("id=".$usershopid." and status=0")->save($data);
+				//记录错误日志
+				if(!$usershop_res) {
+					//如果更新失败，则记入到错误日志
+					file_put_contents($this->pay_log_url."artisans_cft_log.txt",date('Y-m-d H:i:s')."--->用户订单更新支付状态失败,对应的订单号为:".$usershopid.";from:notice"."\r\n",FILE_APPEND);
+					$trade_state = false;
+				}else{
+					//更新红包id状态
+					$this->_updateRedbag($artisans_order['redbag_id'],$artisans_order['openId'],$artisans_order['id']);
+					//核销受益人卡卷
+					$card_code = explode('**', $artisans_order['card_code_id']);
+					$cardid = $card_code[0];
+					$code   = $card_code[1];
+					$this->cleanKQ($userinfo['OpenId'], $cardid, $codeid);
+					//减1
+					$reduceTimenumid = $this->reduceTimenum($artisans_order['userId'], $artisans_order['reservationTime'], $artisans_order['moduleId']);
+					//推送消息
+					$engineerId = M('artisans_user_baseinfo')->where(array('id'=>$artisans_order['userId']))->find();
+					$artInfo = array(
+						'artName'=>$engineerId['trueName'],
+						'artPhone'=>$engineerId['phone'],
+						'userName'=>$artisans_order['name'],
+						'userPhone'=>$artisans_order['phone'],
+						'time'=>$artisans_order['reservationTime'],
+						'moduleName'=>$artisans_order['moduleName'],
+						'userAddress'=>$artisans_order['address'],
+						'ordernum'=>$usershopid,
+						'friendName'=>$artisans_order['friendName'],
+						'friendPhone'=>$artisans_order['friendPhone'],
+						'shortmessage'=>$artisans_order['shortmessage'],
+						'detailAddress'=>$artisans_order['detailAddress'],
+						'forWho'=>$artisans_order['forWho'],
+					);
+					$this->sendMessage($artisans_order['openId'], $engineerId['openId'], $artInfo);
+				}
+			}else{
+				$trade_state = false;
+				file_put_contents($this->pay_log_url."artisans_cft_log".date('Y-m-d').".txt","商品订单号不存在:".$usershopid."\r\n",FILE_APPEND);
+			}
+		}
+	}else{
+		file_put_contents($this->pay_log_url."artisans_cft_log".date('Y-m-d').".txt","财付通返回值错误",FILE_APPEND);
+		$trade_state = false;
+	}
+	if($userinfo_flag && $order_flag and $trade_state) {
+		echo 'success';
+	}else{
+		echo 'fail';
+	}
   }
   
   //查看订单支付状态是否更新成为成功
   public function updateOrder() {
-  	
+  	$getData = I("post.",'','sql_filter');
+	$openid = $getData['order_user_id'];
+	$out_trade_no = $getData["out_trade_no"];
+	//订单信息
+	if(C('ProductStatus') === false) {
+		$orderinfo = M("payment_order")->where(" out_trade_no='{$out_trade_no}' ")->order("create_time desc")->limit(1)->field("trade_state,id")->find();
+	}else{
+		$orderinfo = M("payment_order")->where(" OpenId='{$openid}' and out_trade_no='{$out_trade_no}' ")->order("create_time desc")->limit(1)->field("trade_state,id")->find();
+	}
+	file_put_contents($this->pay_log_url."updateorder.txt",date('Y-m-d H:i:s')."--->用户id:{$openid}----订单号:".$out_trade_no."----".M("payment_order")->getLastSql()."\r\n",FILE_APPEND);
+	//交易状态
+	$trade_state = $orderinfo["trade_state"];
+	if(isset($trade_state) && $trade_state==0 && $orderinfo) {
+		//查看订单状态是否更新，如果没有更新，则更新订单状态
+		$artisans_order = M('artisans_order')->where('id='.$out_trade_no)->find();
+		if($artisans_order['status']<>3) {
+			file_put_contents($this->pay_log_url."updateorder.txt",date('Y-m-d H:i:s')."--->订单号为:".$out_trade_no.",该订单信息:".json_encode($artisans_order)."\r\n",FILE_APPEND);
+			$data['status'] = 3;
+			$data['udate']  = array('exp','now()');
+			$data['update_by']  = 'updateOrder';
+			//修改用户订单状态为已支付
+			$res = M("artisans_order")->where("id=".$out_trade_no." and status<>3")->save($data);
+			if(!$res) {
+				//如果更新失败，则计入到错误日志
+				file_put_contents($this->pay_log_url."updateorder.txt",date('Y-m-d H:i:s')."--->用户订单更新支付状态失败,对应的订单号为:".$out_trade_no."\r\n",FILE_APPEND);
+			}else{
+				$status = 200;
+			}
+			if($status == 200) {
+				//更新红包id状态
+				$this->_updateRedbag($artisans_order['redbag_id'], $artisans_order['openId'], $artisans_order['id']);
+				//核销卡券
+				$card_code=explode('**', $artisans_order['card_code_id']);
+				$cardid=$card_code[0];
+				$code=$card_code[1];
+				$this->cleanKQ($openid,$cardid,$codeid);
+				//产能减1
+				$reduceTimenumid = $this->reduceTimenum($artisans_order['userId'],$artisans_order['reservationTime'],$artisans_order['moduleId']);
+				$engineerId = M('artisans_user_baseinfo')->where(array('id'=>$res['userId']))->find();
+				$artInfo = array(
+					'artName'=>$engineerId['trueName'],
+					'artPhone'=>$engineerId['phone'],
+					'userName'=>$artisans_order['name'],
+					'userPhone'=>$artisans_order['phone'],
+					'time'=>$artisans_order['reservationTime'],
+					'moduleName'=>$artisans_order['moduleName'],
+					'userAddress'=>$artisans_order['address'],
+					'ordernum'=>$out_trade_no,
+					'friendName'=>$artisans_order['friendName'],
+					'friendPhone'=>$artisans_order['friendPhone'],
+					'shortmessage'=>$artisans_order['shortmessage'],
+					'detailAddress'=>$artisans_order['detailAddress'],
+					'forWho'=>$artisans_order['forWho'],
+				);
+				$this->sendMessage($openid,$engineerId['openId'],$artInfo);
+			}
+		}else{
+			$status = 200;
+		}
+	}else{
+		$status = 0;
+	}
+	return json_encode(array('status'=>$status, 'info'=>$orderinfo["id"]));
   }
   
   //查询微信那边是否生成成功订单的信息
   public function findwxorder() {
-  	
+  	$return_data['status'] = 0;
+  	$getData 	= I("post.",'','sql_filter');
+  	$out_trade_no   = $getData["out_trade_no"];
+	$paymentid  	= $getData["paymentid"];
+	$openid 	= $getData["order_userId"];
+	$ret 		= $this->orderQueryApi($out_trade_no);
+	//解析返回的订单结果
+	$error_code = $ret['errcode'];
+	if(isset($error_code) && $error_code == 0) {
+		//调用接口成功，获取订单详情
+		$order_info = $ret["order_info"];
+		if($order_info["ret_code"] == 0) {
+			//如果订单获取成功
+			$trade_state    = $order_info["trade_state"];
+			if($trade_state == 0) {
+				$counntnum = M("payment_order")->where(" OpenId='{$openid}' and out_trade_no='{$out_trade_no}' and trade_state=0 ")->count();
+				if($countnum == 0) {
+					//重新生成微信订单信息
+					$order_info['status'] = 1;
+					$order_info['flag']   = 2;
+					$order_info['OpenId'] = $openid;
+					$order_info['create_time'] = array('exp', 'now()');
+					$return_num = M("payment_order")->add($order_info);
+					file_put_contents($this->pay_log_url."findwxorder.txt",date("Y-m-d H:i:s")."--->系统中微信订单信息号：".$paymentid."--->".M("payment_order")->getLastSql()."\r\n",FILE_APPEND);
+					file_put_contents($this->pay_log_url."findwxorder.txt",date("Y-m-d H:i:s")."--->重新生成的系统中微信订单信息号：".$return_num."\r\n",FILE_APPEND);
+					//查询并更新系统订单的状态
+					$artisans_order = M('artisans_order')->where('id='.$out_trade_no)->find();
+					if($artisans_order['status']<>3) {
+						$data['status'] = 3;
+						$data['udate']  = array('exp','now()');
+						$data['update_by']  = 'findwxorder';
+						//修改用户订单状态为已支付
+						$return_num = M("artisans_order")->where("id=".$out_trade_no." and status<>3")->save($data);
+						if($return_num) {
+							//更新红包id状态
+							$this->_updateRedbag($artisans_order['redbag_id'],$artisans_order['openId'],$artisans_order['id']);
+							//核销卡卷
+							$card_code=explode('**', $artisans_order['card_code_id']);
+							$cardid=$card_code[0];
+							$code=$card_code[1];
+							$this->cleanKQ($openid,$cardid,$codeid);
+							//减1
+							$reduceTimenumid = $this->reduceTimenum($artisans_order['userId'],$artisans_order['reservationTime'],$artisans_order['moduleId']);
+							$engineerId = M('artisans_user_baseinfo')->where(array('id'=>$artisans_order['userId']))->find();
+							$artInfo = array(
+								'artName'=>$engineerId['trueName'],
+								'artPhone'=>$engineerId['phone'],
+								'userName'=>$artisans_order['name'],
+								'userPhone'=>$artisans_order['phone'],
+								'time'=>$artisans_order['reservationTime'],
+								'moduleName'=>$artisans_order['moduleName'],
+								'userAddress'=>$artisans_order['address'],
+								'ordernum'=>$out_trade_no,
+								'friendName'=>$artisans_order['friendName'],
+								'friendPhone'=>$artisans_order['friendPhone'],
+								'shortmessage'=>$artisans_order['shortmessage'],
+								'detailAddress'=>$artisans_order['detailAddress'],
+								'forWho'=>$artisans_order['forWho'],
+							);
+							$this->sendMessage($openid,$engineerId['openId'],$artInfo);
+						}
+						file_put_contents($this->pay_log_url."findwxorder.txt",date("Y-m-d H:i:s")."--->系统中订单信息号：".$out_trade_no."--->".M("artisans_order")->getLastSql()."\r\n",FILE_APPEND);
+						file_put_contents($this->pay_log_url."findwxorder.txt",date("Y-m-d H:i:s")."--->更新之后的返回的值：".$return_num."\r\n",FILE_APPEND);
+					}
+				}
+				$return_data['status'] = 200;
+			}
+		}
+  	}
+  	return json_encode($return_data);
   }
   
   //核销卡卷
   public function cleanQ($openid, $moduleId) {
-  	
+  	if(!($openid && $moduleId)) {
+  		return false;
+  	}
+  	$cardid = $this->_cardid[$moduleId];
+  	if(empty($cardid)) {
+  		return false;
+  	}
+  	$getCleanQurl = $this->_artisans_url.$cardid.'&openid='.$openid;
+  	$getCleanInfo = send_get_curl($getCleanQurl);
+  	$getCleanInfo = json_decode($getCleanInfo, true);
+  	if($getCleanInfo['error_code'] === 0) {
+  		$card_code = $getCleanInfo['data']['card_codes'][0]['card_code'];
+  		$url 	   = $this->_sendCleanQ_url.'?code='.$card_code.'&consume_type=100';
+  		$reurnInfo = send_get_curl($url);
+  		$returnInfo= json_decode($reurnInfo, true);
+  		if($returnInfo['error_code'] === 0) {
+  			$cleanQlogData['status'] = 1;
+  		}else{
+  			$cleanQlogData['status'] = 0;
+  		}
+  	}else{
+  		$card_code = '';
+  		$cleanQlogData['status'] = -1;
+  	}
+  	$cleanQlogData['user_id']  	= $openid;
+  	$cleanQlogData['card_code'] 	= $card_code;
+  	$cleanQlogData['return_status'] = $returnInfo['error_code'];
+  	$cleanQlogData['type']		= 2;
+  	$cleanQlogData['cdate']		= date('Y-m-d H:i:s');
+  	M('interface_log')->add($cleanQlogData);
   }
   
   public function cleanKQ($openid,$cardid,$codeid) {
-  
+  	$getCleanQurl = $this->_artisans_url.$cardid.'&openid='.$openid;
+  	$getCleanInfo = send_get_curl($getCleanQurl);
+  	$getCleanInfo = json_decode($getCleanInfo, true);
+  	if($returnInfo['error_code'] === 0 && $getCleanInfo['data']['card_codes'][0]['id'] == $codeid) {
+  		$card_code = $getCleanInfo['data']['card_codes'][0]['card_code'];
+  		$url	   = $this->_sendCleanQ_url.'?code='.$card_code.'&consume_type=100';
+  		$reurnInfo = send_get_curl($url);
+  		$returnInfo = json_decode($reurnInfo, true);
+  		if($returnInfo['error_code'] === 0) {
+  			$cleanQlogData['status'] = 1;
+  		}else{
+  			$cleanQlogData['status'] = 0;
+  		}
+  	}else{
+  		$card_code = '';
+  		$cleanQlogData['status'] = -1;
+  	}
+  	$cleanQlogData['open_id'] = $openid;
+  	$cleanQlogData['card_id'] = $cardid;
+  	$cleanQlogData['code_id'] = $codeid;
+  	$cleanQlogData['card_code'] = $card_code;
+  	$cleanQlogData['return_status'] = $returnInfo['error_code'];
+  	$cleanQlogData['updated_time'] = date('Y-m-d H:i:s');
+  	M('artisans_card_log')->add($cleanQlogData);
   }
   
   //推送消息
+  public function sendMessage($openId = '', $engineerId='', $userinfo = array()) {
+  	$user_url = 'http://localhost/'.C("TP_PROJECT_NAME").'/index.php/Craft/qcsstatus2?ordernum='.$userinfo['ordernum'];
+  	$art_url  = 'http://localhost/'.C("TP_PROJECT_NAME").'/index.php/Craft/qcsstatus2?ordernum='.$userinfo['ordernum'];
+  	file_put_contents($this->pay_log_url."sendm.txt", date("Y-m-d H:i:s")."--->openid:".$openId."--->engineerId".$engineerId."\r\n", FILE_APPEND);
+  	if($userinfo['forWho'] == 1) {
+  		//为朋友
+  		$message_i = '您已经帮朋友'.$userinfo['friendName'].'预约了XXX的【'.$userinfo['moduleName'].'】服务，XXX是'.$userinfo['artName'].'，服务开始时间'.$userinfo['time'].'，已经短信通知了您的朋友。<a href="'.$user_url.'">点击这里</a>查看详情；点击这里点击后进入预约单详情页面。';
+  		$address = $userinfo['detailAddress'];
+		$message_j = '客户'.$userinfo['friendName'].'已经预约你上门进行【'.$userinfo['moduleName'].'】服务，电话：'.$userinfo['friendPhone'].'，时间:'.$userinfo['time'].'；地点：'.$address.'；是Ta朋友帮他预约的。<a href="'.$art_url.'">点击这里</a>查看详情；同时请让上门后打开页面，请用户操作。';
+		$message_k = "客户{$userinfo['friendName']}已经预约你上门进行【{$userinfo['moduleName']}】服务，电话：{$userinfo['friendPhone']}，时间:{$userinfo['time']}；地点：{$address}；是Ta朋友帮他预约的。";
+		//发送微信消息
+		$this->sendWeixinMsg($openId,$message_i);
+		$this->sendWeixinMsg($engineerId,$message_j);
+		//给好友发送短信
+		$shortmessage = "您的好友为您预约了XXXXX {$userinfo['moduleName']}的服务，XXX是{$userinfo['artName']}，手机：{$userinfo['artPhone']}，服务时间：{$userinfo['time']}。";
+		if($userinfo['shortmessage']){
+			$shortmessage .= "您朋友还想和您说:{$userinfo['shortmessage']}";
+		}
+		$this->SendShortMessage($userinfo['friendPhone'],$shortmessage);
+		$this->SendShortMessage($userinfo['artPhone'],$message_k);
+  	}else{
+  		//为自己
+		$message_i  = '【服务预约】您已经预约XXX的【'.$userinfo['moduleName'].'】的服务，XXX是'.$userinfo['artName'].'，电话号码：'.$userinfo['artPhone'].'；服务开始开始时间'.$userinfo['time'].'，<a href="'.$user_url.'">点击这里</a>查看详情。';
+		$short_msg_i = "【服务预约】您已经预约XXX的【{$userinfo['moduleName']}】的服务，XXX是{$userinfo['artName']}，电话号码：{$userinfo['artPhone']}；服务开始开始时间{$userinfo['time']}。";
+		$short_msg_j = "【服务预约】用户{$userinfo['userName']}，电话{$userinfo['userPhone']}，已经预约你的【{$userinfo['moduleName']}】的服务，服务开始开始时间{$userinfo['time']}，请及时联系用户。";
+		$message_j =  '【服务预约】用户名'.$userinfo['userName'].'，电话'.$userinfo['userPhone'].'，已经预约你的【'.$userinfo['moduleName'].'】的服务，时间'.$userinfo['time'].' <a href="'.$art_url.'">点击这里</a>可以查看详情，请记得提醒用户在我的服务中更新单据状态，并点评哦';
+		//发送微信消息
+		$this->sendWeixinMsg($openId,$message_i);   //为用户发送微信消息
+		$this->sendWeixinMsg($engineerId,$message_j);  //为XXX发送微信消息
+		//发送短信
+		$this->SendShortMessage($userinfo['userPhone'],$short_msg_i);
+		$this->SendShortMessage($userinfo['artPhone'],$short_msg_j);
+  	}
+  }
