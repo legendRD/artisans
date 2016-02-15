@@ -1694,3 +1694,28 @@ class WxController extends CommonController {
 		$this->SendShortMessage($userinfo['artPhone'],$short_msg_j);
   	}
   }
+
+	//预约时间  减1
+	public function reduceTimenum($userId,$time,$moduleId){
+		$where = array(
+				'userId'=>$userId,
+				'startTime'=>array('elt',$time),
+				'endTime'=>array('egt',$time),
+				'moduleId'=>$moduleId,
+		);
+		$timeInfo = M('artisans_time_price')->where($where)->find();
+		$useNum = $timeInfo['useNum']+1;
+		$nouseNum =  $timeInfo['nouseNum']-1;
+		$saveData = array(
+				'useNum'=>$useNum,
+				'nouseNum'=>$nouseNum,
+				'udate'=>date('Y-m-d H:i:s'),
+		);
+		$whereNew = array(
+				'userId'=>$userId,
+				'startTime'=>array('elt',$time),
+				'endTime'=>array('egt',$time),
+		);
+		$id = M('artisans_time_price')->where($whereNew)->save($saveData);
+		return $id;
+	}
