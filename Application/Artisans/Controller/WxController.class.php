@@ -1822,3 +1822,20 @@ class WxController extends CommonController {
 		//分析订单的查询结果
 		return  json_decode($ret,true);
 	}
+	
+	public function apply() {
+		$appid  = C("APP_ID");
+		$this->appid    = $appid;
+		if(I("code")){
+			$code   = I("code");
+			$shop   = D("WeiXinApi");
+			$userinfo   = $shop->getOAuthAccessToken($code);
+			$openid = $userinfo["openid"];
+		}else{
+			$openid = $this->reGetOAuthDebug(U("Craft/apply"));
+		}
+		$this->share_url = "http://localhost/".C("TP_PROJECT_NAME")."/index.php/PlanRepair/index";
+		$this->imgUrl="http://localhost/".C("TP_PROJECT_NAME")."/Public/Images/PlanRepair/share.jpg";
+		$this->assign('user_id',$openid);
+		$this -> display('qcs_applay');
+	}
