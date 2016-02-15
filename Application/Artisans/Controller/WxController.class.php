@@ -1719,3 +1719,73 @@ class WxController extends CommonController {
 		$id = M('artisans_time_price')->where($whereNew)->save($saveData);
 		return $id;
 	}
+	
+	/**
+	 *解析xml格式的文档
+	 *@param xml文件或者相关数据
+	 *@return array 返回要插入的数据数组
+	 */
+	public function parseXml($xml_data,$param){
+		//初始化要插入的数组
+		$returndata = array();
+		//实例化 dom解析对象
+		$doc = new DOMDocument ( '1.0', 'utf-8' );
+		//保留原有的空格元素，默认清除
+		$doc->preserveWhiteSpace = false;
+		//加载xml元素
+		$doc->loadXML( $xml_data );
+		//实例化 xpath对象
+		$xpath = new DOMXPath ( $doc );
+		//根据用户所传数组参数来进行解析
+		foreach($param as $key=>$value){
+			//根据指定的字段实例化相关的数据对象
+			$item = $xpath->query("//xml/".$value."[1]");
+			if(!empty($item)){
+				//获取数据长度
+				$length = $item->length;
+				//获取该字段的数据
+				$nodeValue = $item->item(0)->nodeValue;
+				//如果该节点有数据,才获取该数据
+				if($length>0){
+					$returndata[$value] = $nodeValue;
+				}
+			}
+		}
+		//返回解析好的结果
+		return $returndata;
+	}
+
+	/*
+	 * @desc 根据经纬度，计算两点之间的距离
+	* @param float $lat 纬度
+	* @param float $lng 经度
+	*/
+	public function getDistance($lat1, $lng1, $lat2, $lng2){
+		$r = 6378.137;  //地球半径
+		//角度转为弧度
+		$radLat1 = deg2rad($lat1);
+		$radLat2 = deg2rad($lat2);
+		$radLng1 = deg2rad($lng1);
+		$radLng2 = deg2rad($lng2);
+		//sqrt：平方根，pow(x, n)：x的n次方的幂，asin：反正弦，sin：正弦
+		$s = 2*asin(sqrt(pow(sin(($radLat1 - $radLat2)/2),2)+cos($radLat1)*cos($radLat2)*pow(sin(($radLng1-$radLng2)/2),2)))*$r;
+		return $s;
+	}
+	
+	public function qcslist(){
+		$this -> display('qcs_list');
+	}
+	
+	public function qcs_success()
+	{
+		$this->display('qcs_success');
+	}
+	
+	public function qcs_failed()
+	{
+		$openid=I('openid');
+		$this->assign('openid',$openid);
+		$this->display('qcs_failed');
+	}
+	
+	
