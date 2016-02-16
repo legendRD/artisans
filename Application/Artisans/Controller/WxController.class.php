@@ -1880,7 +1880,7 @@ class WxController extends CommonController {
 			$msg['info'] = 'failed';
 			$msg['url']  = $url;
 		}
-		echo json_encode($msg);
+		return json_encode($msg);
 	}
 	
 	public function setsximinutes() {
@@ -2070,6 +2070,140 @@ class WxController extends CommonController {
 		$data['timeStr']=implode(',',$timeStr);
 		$res=M('artisans_update_order2')->where('ordernum='.$id)->save($data);
 		if($res) {
-			echo json_encode(array('status'=>'200', 'time'=>$time));
+			return json_encode(array('status'=>'200', 'time'=>$time));
 		}
+	}
+	
+	public function cancel_ajax() {
+		$id = I('post.id','','sql_filter');
+		$result = M('artisans_order')->where("id='{$id}'")->save(array('status'=>'2', 'update'=>array('exp','now()')));  // 取消订单
+		if($result) {
+			$userinfo=M('artisans_order')->find($id);                          //通过订单号去查询出用户的信息
+			$qcsinfo=M('artisans_user_baseinfo')->find($userinfo['userId']);   //通过用户信息中的userId 查询出XXX的信息
+			$serviceinfo=M('artisans_modules')->find($userinfo['moduleId']);   //获取技能的服务信息
+			$userinfo['name']=empty($userinfo['name'])?$userinfo['friendName']:$userinfo['name']; // 朋友的姓名
+			$user_openId=$userinfo['openId'];                                  //用户的openId
+			$user_phone=$userinfo['phone'];                                    //用户的手机号
+			
+			// 给用户发的消息
+			$user_content ='【服务取消】您已经取消您预约的XXXXX的【'.$serviceinfo['name'].'】服务，服务相应的费用我们会在2个工作日内退款给您，部分银行到账期为3-15天，请您注意查收。同时感谢您对XXXXX的支持。';
+			// 给XXX发的消息
+			$qcs_content ='【服务取消】用户'.$userinfo['name'].'，电话'.$user_phone.'，已经取消预约你的【'.$serviceinfo['name'].'】服务，原服务时间是'.$userinfo['reservationTime'].'。';
+			
+			//推送微信消息消息
+			D('WeiXinApi') -> sendTextMessage($user_openId, $user_content);     //给用户推送取消订单的消息
+			D('WeiXinApi') -> sendTextMessage($qcs_openId, $qcs_content);       //给XXX推送取消订单的消息
+	
+			// 推送短信消息
+			$this->SendShortMessage($user_phone,$user_content);               //给用户发送取消订单的消息
+			$this->SendShortMessage($qcs_phone,$qcs_content);                 //给XXX发送取消订单的消息
+			
+			return json_encode(array('status' => '200'));
+		}else{
+			return json_encode(array('status' => '800'));
+		}
+	}
+	
+	// 改时间
+	public function modifyTime() {
+		//获取到orderid  和 openid
+		$data['id']=I('get.orderid','','sql_filter');
+		$data['openId']=I('get.openid','','sql_filter');
+	
+		//通过订单号来确定订单数据
+		$order=M('artisans_order')->where($data)->find();
+		if ($order) {
+			// 获取到以前预约的时间
+			$reservationTime=strtotime( $order['reservationTime']);
+			// 获取到当前时间
+			$nowTime=time();
+			if ($reservationTime-$nowTime>7200) {
+				//当前时间离预约时间大于两小时
+				$userId=$order['userId'];
+				$res=M('artisans_user_baseinfo')->find($userId);
+				echo $res['city'];
+				echo "<hr/>";
+				echo "可以改签";
+				echo "<hr/>";
+				echo "请选择时间";
+				echo "<hr/>";
+				echo  "<a href=''>时间选好了我要选XXX</a>";
+				// 调取选择时间的页面
+			}else{
+				//当前时间离预约时间不足两小时
+				echo "不可以改签";
+			}
+		}else{
+			// 用户的openId和订单表中的openid不一致时
+			echo "没有权限修改订单";
+		}
+	}
+	
+	// 调研的方法
+	public function survey() {
+		// 筛选从数据库中取出可以显示的问题
+		$model=M('artisans_question')->where(array('displayStatus'=>1))->select();
+		// 获取客户的openid
+		if(I("code")) {
+			$code   = I("code");
+			$shop   = D("WeiXinApi");
+			$userinfo   = $shop->getOAuthAccessToken($code);
+			$openid = $userinfo["openid"];
+		}else{
+			$openid = $this->reGetOAuthDebug(U('Craft/survey'));
+		}
+		
+		// 分配到模板变量中去
+		$this->assign('openId',$openid);
+		$this->assign('question',$model);
+		
+		// 显示模板页面
+		$this->display('qcs_survey');
+	}
+
+	// 调研提交表单的方法
+	public function survey_submit() {
+		// 获取表单提交的数据
+		$data=I('post.select','','sql_filter');                        //获取问题id的数组
+		$insert['phone']=I('post.telephone','','sql_filter');          //获取电话号
+		$insert['openId']=I('post.openId','','sql_filter');            //获取用户的openId
+		$insert['other']=I('post.other','','sql_filter');              //获取用户的其他信息
+		$insert['createTime']=time();                  		       // 获取时间添加数据的时间戳
+		
+		// 拼接表单提交的id数据
+		$insert['questionIdStr']=implode(',',$data);
+	
+		// 生成一笔调查问卷数据
+		$model=M('artisans_questionnaire')->add($insert);
+	
+		// 更新问题回答条数
+		$model=M('artisans_question')->where(array('id'=>array('in',$insert['questionIdStr'])))->setInc('countTime');
+	
+		if ($model) {
+			$returnData = array('status'=>200, 'msg'=>'非常感谢您，参与需求调研。');
+			return json_encode($returnData);
+		}else{
+			$returnData = array('status'=>300, 'msg'=>'提交失败请重新提交。');
+			return json_encode($returnData);
+		}
+	}
+	
+	// 发送短消息的方法
+	private function SendShortMessage($phone,$contents){
+		// 实例化一个发送短信的对象
+		$soap = new SoapClient('http://localhost/webservice/deliverMessage/SmsService.asmx?WSDL');
+		// 发送短消息
+		$i = $soap -> SendMessage(array('UserName'=>'aaaa','Password'=>'aaaa','Mobile'=>$phone,'Contents'=>$contents));
+		// 记录日志
+		file_put_contents($this->pay_log_url."sendm.txt",date("Y-m-d H:i:s")."--->phone:".$phone.",sendphone:".serialize($i)."\r\n",FILE_APPEND);
+	}
+	
+	private function sendWeixinMsg($openId,$msg){
+	
+		// 实例化一个微信发送的对象
+		$WeiXinApi = D("WeiXinApi");
+		// 推送微信消息
+		$i = $WeiXinApi->sendTextMessage($openId,$msg);
+		// 记录微信推送日志
+		file_put_contents($this->pay_log_url."sendm.txt",date("Y-m-d H:i:s")."--->openid:".$openId.",sendmsg:".serialize($i)."\r\n",FILE_APPEND);
 	}
