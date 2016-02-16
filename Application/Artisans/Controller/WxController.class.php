@@ -2299,3 +2299,80 @@ class WxController extends CommonController {
 		}
 		return $session;
 	}
+	
+	// 结果页面
+	public function answer_result() {
+		// 通过opeid获取到答题的数据
+		$res=M('artisans_survey')->where(array('openid'=>I('get.openid','','sql_filter')))->find();
+		// 获得答对的个数
+		$ture_num=$res['true_num'];
+		if ($ture_num>=6) {
+			//答对6以上个题目
+			$level='A';
+		}else{
+			//答对6以下个题目
+			$level='B';
+		}
+		
+		$this->assign('level',$level);
+		$this->assign('ture_num',$ture_num);
+		
+		$this->display('qcs_question_rsl');
+	}
+	
+	// 处理答案结果的方法
+	public function  save_result() {
+		// 获取到客户所答的数据
+		$data=I('post.data','','sql_filter');
+		// 获取openid
+		$openid=I('get.openid','','sql_filter')?I('get.openid','','sql_filter'):'test';
+		// 获取到得分数据
+		$data=$this->get_fraction($data);
+		// openid赋值
+		$data['openid']=$openid;
+		// 查询记录表
+		$res=M('artisans_survey')->where(array('openid'=>$openid))->find();
+		if(empty($res)) {
+			// 如果没有该记录 则添加该记录
+			$add=M('artisans_survey')->add($data);
+			if ($add) {
+				// 添加成功后返回状态
+				return json_encode(array('status'=>200,'comment'=>'提交成功'));
+			}else{
+				// 添加失败后返回状态
+				return json_encode(array('status'=>400,'comment'=>'提交失败'));
+			}
+		}else{
+			// 重复提交的状态
+			return json_encode(array('status'=>300,'comment'=>'你已经重复提交'));
+		}
+	}
+	
+	// 计算得分的方法
+	private function get_fraction($data) {
+		// 获取到所有正确答案的选项
+		$res = M('artisans_answer')->where(array('answer'=>1))->select();
+		// 遍历正确答案的id为数值
+		foreach($res as $value) {
+			$array[] = $value['id'];
+		}
+		// 初始化正确答案的个数为0
+		$ture_num=0;
+		// 判断所答题目和正确答案的个数
+		foreach ($data as $val) {
+			if(in_array($val, $array)) {
+				// 对一个题目自加1
+				$true_num++;
+			}
+		}
+		// 返回状态是否答完
+		$datas['status']=count($array)==count($data)?1:0;
+		// 回答正确的个数
+		$datas['true_num']=$ture_num;
+		// 所答的答案
+		$datas['answer']=implode(',',$array);
+		//正确的答案
+		$datas['reply']=implode(',',$data);
+		// 返回答案
+		return $datas;
+	}
