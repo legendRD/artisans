@@ -1839,3 +1839,91 @@ class WxController extends CommonController {
 		$this->assign('user_id',$openid);
 		$this -> display('qcs_applay');
 	}
+	
+	public function getQcsCount() {
+		$openid = I('openid');
+		$datetime = date('Y-m-d H:i:s');
+		$path = "/share/qcscount.txt";
+		$content = "时间：".$datetime.",openid=".$openid."\r\n";
+		file_put_contents($path, $content, FILE_APPEND);
+		Vendor("Redis.redisDB");
+		$redis_db = redisDB::getInstance(C("REDIS_SERVER"), C("REDIS_PORT"));
+		$ret = $redis_db->increment(ltrim(__ROOT__, "/")."_add");
+		if($openid!='') {
+			$saveHtmlName = '/share/qcsjs.txt';
+			$tjnum = file_get_contents($saveHtmlName);
+			$fp = fopen($saveHtmlName);
+			fwrite($fp, $tjnum);
+			fclose($fp);
+			if($tjnum=='') {
+				$tjnum = 1356;
+			}
+			$tjnum+=1;
+			file_put_contents($saveHtmlName, $tjnum);
+		}
+		$this->ajaxReturn($ret);
+	}
+	
+	public function getQcsList() {
+		//获取openid
+		$openid = I('openid');
+		//开抢时间超过10分钟
+		$difftime = $this->setsximinutes();
+		if($difftime>=0 && $difftime<600) {
+			//抢 订单页
+			$url = 'http://localhost/vmall/index.php/flash_sale/flashSaledetail/dproid/730/product_id/18953/d_shop_id/726';
+			$msg['info'] = 'goodlist';
+			$msg['url']  = $url;
+		}elseif($difftime >= 600) {
+			//>=600seconds
+			$url = 'qcs_failed?openid='.$openid;
+			$msg['info'] = 'failed';
+			$msg['url']  = $url;
+		}
+		echo json_encode($msg);
+	}
+	
+	public function setsximinutes() {
+		$qianggou = new Model('qianggou');
+		$difftime = $qianggou->query("select unix_timestamp(current_timestamp())-unix_timestamp('2016-02-14 08:00:00') as time");
+		return $difftime[0]['time'];
+	}
+	
+	public function ajapply(){
+		$postData = I('post.','','sql_filter');
+		$data['openId'] = $postData['user_id'];
+		$data['name'] = $postData['name'];
+		$data['phone'] = $postData['phone'];
+		$data['description'] = $postData['content'];
+		$data['email']=$postData['email'];
+		$data['status'] = 0;
+		$data['cdate'] = date('Y-m-d H:i:s');
+		$id = M('artisans_apply')->add($data);
+		if($id) {
+			$return_data = array('status'=>200);
+		}else{
+			$return_data = array('status'=>0);
+		}
+		return json_encode($return_data);
+	}
+	
+	public function adddianping($data) {
+		$ret = D("DianPing")->addjilu($data);
+		$json = json_decode($ret, true);
+		file_put_contents('/share/a.txt', date("Y-m-d H:i:s").serialize($json)."\r\n", FILE_APPEND);
+		//200：成功并发送点评消息
+		if($json['code']=="200") {
+			$content = array(
+				array(
+					"title"=>'点击为TA评价',
+					"description"=>'XXXXX为您提供的服务，您还满意吗？请为Ta进行点评',
+					"url"=>"http://localhost/valuation/index.php/tel/index.html?uid=".$data['openid']."&time=".strtotime($data['create_time']),				)
+					'picurl'=>'http://localhost/weixin/link/dianping1.jpg'
+				)
+			);
+			D('WeiXinApi')->sendNewsMessage($data['openid'],$content);
+			return '200';
+		}else{
+			return $json['code'];
+		}
+	}
