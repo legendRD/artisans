@@ -1927,3 +1927,76 @@ class WxController extends CommonController {
 			return $json['code'];
 		}
 	}
+	
+	public function qcsstatus2() {
+		$ordernum = I('get.ordernum','','sql_filter'); //获取订单编号
+		// GetOAuth认证客户的信息
+		if(I("code")){
+			$code   = I("code");
+			$shop   = D("WeiXinApi");
+			$userinfo   = $shop->getOAuthAccessToken($code);
+			$openid = $userinfo["openid"];
+		}else{
+			$openid = $this->reGetOAuthDebug(U('Craft/qcsstatus2').'?ordernum='.$ordernum);
+		}
+		// 订单查询的条件
+		$order_where = array(
+				'id'=>$ordernum,
+				'status'=>array('in','2,3,4,7,8'),
+		);
+		$array = M('artisans_order') -> where($order_where) -> find();
+		if($array['status']==2){
+			$nostatus=0;
+		}else{
+			$nostatus=1;
+		}
+		if($array['forWho'] == 1){
+			$array['name'] = $array['friendName'];
+			$array['phone'] = $array['friendPhone'];
+			$array['address'] =$array['detailAddress'];
+		}
+		// 如果订单中客户的openid 和 GetOAuth认证客户的信息一致 那么可以判断角色
+		if ($array['openId']==$openid) {
+			$role=2;
+		}else{
+			$role=1;
+		}
+		$tmp = $array['moduleId'];
+		$tmp = M('artisans_modules') -> where("id='{$tmp}'") -> find();
+		$array['module_name'] = $tmp['name'];
+		$tmp = $array['moduleId'];
+		$mystep = M('artisans_key_step')->where('moduleId='.$tmp)->select();
+		$array['idStr']='';
+		$array['typeStr']='';
+		$array['timeStr']='';
+		foreach($mystop as $value) {
+			$array['idStr'] .= $value['id'].',';
+			$array['typeStr'] .= '2,';
+			$array['timeStr'] .= '0,';
+		}
+		$array['idStr']=substr($array['idStr'],0,strlen($array['idStr'])-1);
+		$array['typeStr']=substr($array['typeStr'],0,strlen($array['typeStr'])-1);
+		$array['timeStr']=substr($array['timeStr'],0,strlen($array['timeStr'])-1);
+		$tmp=$array['id'];
+		$step=M('artisans_update_order2')->where('ordernum='.$tmp)->find();
+		if (empty($step)) {
+			$data['idStr']=$array['idStr'];
+			$data['typeStr']=$array['typeStr'];
+			$data['userId']=$array['userId'];
+			$data['moduleId']=$array['moduleId'];
+			$data['timeStr']=$array['timeStr'];
+			$data['ordernum']=$array['id'];
+			if($data['userId']!='') {
+				$state=M('artisans_update_order2')->add($data);
+			}
+		}
+		$tmp=$array['id'];
+		$step=M('artisans_update_order2')->where('ordernum='.$tmp)->find();
+		$array['idStr']=$step['idStr'];
+		$array['typeStr']=$step['typeStr'];
+		$array['timeStr']=$step['timeStr'];
+		$idStr=explode(',',$array['idStr']);
+		$typeStr=explode(',',$array['typeStr']);
+		$timeStr=explode(',',$array['timeStr']);
+		
+	}
