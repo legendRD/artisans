@@ -2376,3 +2376,87 @@ class WxController extends CommonController {
 		// 返回答案
 		return $datas;
 	}
+	
+	//工具方法 获取到题号数组
+	private  function option($array) {
+		//生成一个从1 到指定长度的一个option数组
+		$option = range(1, $array['length']);
+		//定义一个 字母字典
+		$str='abcdefghijklmnopqrstuvwxyz';
+		//判断类型
+		if($array['type'] == 'code') {
+			for($i=0;$i<$array['length'];$i++) {
+				//为数组中的值赋值为字母
+				$option[$i] = $str{$i%26};
+			}
+		}
+		//判断大小写
+		if($array['size'] == 'big') {
+			foreach($option as &$value) {
+				// 为数组中的值改为大写
+				$value = strtoupper($this->num2char($value,$array['mode']));
+			}
+		}
+		//返回该题号数组
+		return $option;
+	}
+	
+	private function num2char($num, $mode=true) {
+		// 判断字符串类型是否为数字
+		if(is_numeric($num)) {
+			//定义数字
+			if(!$mode) {
+				// 设置数字的基本元素为大写
+				$char = array('零','一','二','三','四','五','六','七','八','九');
+				// 设置数字的基本单位为大写
+				$dw = array('','十','百','千','','万','亿','兆');
+				// 设置小数点的字符
+				$dec = '点';
+			}else{
+				// 设置数字的基本元素为繁体大写
+				$char = array('零','壹','贰','叁','肆','伍','陆','柒','捌','玖');
+				// 设置数字的基本单位为繁体大写
+				$dw = array('','拾','佰','仟','','萬','億','兆');
+				// 设置小数点的繁体字符
+				$dec = '點';
+			}
+			// 初始化字符
+			$retval = '';
+			// 正则匹配含有0开头的数字
+			preg_match_all('/^0*(\d*)\.?(\d*)/', $num, $ar);
+			if($ar[2][0] != '') {
+				//如果有小数，先递归处理小数
+				$retval = $dec.ch_num($ar[2][0], false);
+			}
+			if($ar[1][0] != '') {
+				// 如果没有小树将该字符翻转
+				$str = strrev($ar[1][0]);
+	
+				// 循环反转的字符串
+				for($i=0;$i<strlen($str);$i++) {
+					// 将数字转为大写的基本元素
+					$out[$i] = $char[$str[$i]];
+					// 如果基本元素不等于0 每4位拼接一个单位
+					$out[$i] .= $str[$i] != '0'? $dw[$i%4] : '';
+					// 如果相邻两个都是0 则单位空
+					if($str[$i]+$str[$i-1] == 0){
+	
+						$out[$i] = '';
+	
+					}
+					// 如果第4位数是0
+					if($i%4 == 0){
+						// 取万以上的单位
+						$out[$i] .= $dw[4+floor($i/4)];
+					}
+				}
+				// 连接这些字符串
+				$retval = join('',array_reverse($out)) . $retval;
+				// 返回数据
+				return $retval;
+			}else{
+				// 原样返回
+				return $num;
+			}
+		}
+	}
