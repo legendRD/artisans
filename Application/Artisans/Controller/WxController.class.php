@@ -2198,8 +2198,8 @@ class WxController extends CommonController {
 		file_put_contents($this->pay_log_url."sendm.txt",date("Y-m-d H:i:s")."--->phone:".$phone.",sendphone:".serialize($i)."\r\n",FILE_APPEND);
 	}
 	
+	// 发送短消息的方法
 	private function sendWeixinMsg($openId,$msg){
-	
 		// 实例化一个微信发送的对象
 		$WeiXinApi = D("WeiXinApi");
 		// 推送微信消息
