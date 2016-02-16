@@ -2198,7 +2198,7 @@ class WxController extends CommonController {
 		file_put_contents($this->pay_log_url."sendm.txt",date("Y-m-d H:i:s")."--->phone:".$phone.",sendphone:".serialize($i)."\r\n",FILE_APPEND);
 	}
 	
-	// 发送短消息的方法
+	// 发送微信消息的方法
 	private function sendWeixinMsg($openId,$msg){
 		// 实例化一个微信发送的对象
 		$WeiXinApi = D("WeiXinApi");
@@ -2206,4 +2206,96 @@ class WxController extends CommonController {
 		$i = $WeiXinApi->sendTextMessage($openId,$msg);
 		// 记录微信推送日志
 		file_put_contents($this->pay_log_url."sendm.txt",date("Y-m-d H:i:s")."--->openid:".$openId.",sendmsg:".serialize($i)."\r\n",FILE_APPEND);
+	}
+	
+	//调研
+	public function problem() {
+		// 获取openid
+		if(I("code")){
+			$code   = I("code");
+			$shop   = D("WeiXinApi");
+			$userinfo   = $shop->getOAuthAccessToken($code);
+			$openid = $userinfo["openid"];
+		}else{
+			$openid = $this->reGetOAuthDebug(U('Craft/problem'));
+		}
+		
+		// 如果获取的openid为空 则获取sessionid
+		$openid = empty($openid)?$this->get_session_id():$openid;
+		if(empty($openid)) {
+			// 如果$openid 还为空 则刷新这个页面
+			echo "<script>window.location='problem'</script>";
+			// 并终止后续程序
+			exit;
+		}
+		
+		// 查看调查问卷的openid是否有数据
+		$res=M('artisans_survey')->where(array('openid'=>$openid))->find();
+		if($res) {
+			// 如果有跳转到结果页
+			header('location:answer_result/openid/'.$openid);
+		}
+		
+		// 查找数据库中所有状态为1的问题
+		$res = M('artisans_problem')->where(array('status'=>1))->select();
+		// 初始化参数题号参数  [A a 1 一] 四种题号参数
+		$option=array(
+				// 'type'      =>'code',       //type      code为字母  不填则为数字
+				// 'mode'      =>true,         //mode      true数字开启繁体模式  必须为数字大写才能生效
+				// 'size'      =>'big',        //size      big为为大写  不填则为小写
+				'length'       =>count($res)   //length    需要生成的编号长度  传数值类型
+		);
+		// 获取到题号的数据
+		$quest = $this->optioon($option);
+		// 遍历题号数据以及题目数据 并进行整理
+		foreach($res as $key=>&$value) {
+			// 将题号拼接到题目数据中
+			$value['title']=$quest[$key];
+			// 查询该题目的所有选项
+			$data=M('artisans_answer')->where(array('pid'=>$value['id']))->select();
+			// 初始化选项题号参数  为 A B C 类型
+			$conf_opt=array(
+					'type'     =>'code',
+					'size'     =>'big',
+					'length'   =>count($data)
+			);
+			// 将选项顺序打乱
+			shuffle($data);
+			// 获取到题号数据
+			$opt=$this->option($conf_opt);
+			// 遍历选项数据
+			foreach($data as $key => &$optval) {
+				// 将题号拼接到选项的数据中
+				$optval['title']=$opt[$key];
+				if ($optval['answer']==1) {
+					// 把正确答案的id 放入到$result的数组中
+					$result[]=$optval['id'];
+				}
+			}
+			// 把题目选项的数据放入题目中去
+			$value['option']=$data;
+		}
+		// 把正确答案转为js的数组
+		$result = json_encode($result);
+		
+		$this->assign('openid',$openid);
+		$this->assign('answer',$result);
+		$this->assign('problem',$res);
+		
+		$this->display('qcs_question');
+	}
+	
+	// 获取到sessionid的方法
+	public function get_session_id() {
+		//切割http_cookie中的信息
+		$arr = explode(':', $_SERVER['HTTP_COOKIE']);
+		foreach($arr as $value) {
+			//切割cookie数组
+			$array = explode('=', $value);
+			if('PHPSESSID' === trim($array[0])) {
+				$session = $array[1];
+				break;
+			}
+		}
+		return $session;
 	}
