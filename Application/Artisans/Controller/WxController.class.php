@@ -1998,5 +1998,8 @@ class WxController extends CommonController {
 		$idStr=explode(',',$array['idStr']);
 		$typeStr=explode(',',$array['typeStr']);
 		$timeStr=explode(',',$array['timeStr']);
-		
+		foreach($mystep as $key=>&$value) {
+			$value['status'] = $typeStr[$key];
+			$value['time']   = date('Y-m-d H:i', $timeStr[$key]);
+		}
 	}
