@@ -2002,4 +2002,74 @@ class WxController extends CommonController {
 			$value['status'] = $typeStr[$key];
 			$value['time']   = date('Y-m-d H:i', $timeStr[$key]);
 		}
+		$tmp = M('artisans_user_baseinfo') -> where("id={$array['userId']}") -> find();
+		$array['craft_name'] = $tmp['trueName'];
+		$array['role']	     = $role;
+		$array['userName']   = $tmp['userName'];
+		
+		$typeStr = explode(',', $array['typeStr']);
+		$isorder = in_array('1', $typeStr)||in_array('0', $typeStr)?1:0;
+		
+		$this->assign('isorder',$isorder);
+		$this->assign('nostatus',$nostatus);
+		$this->assign('openid',$openid);
+		$this->assign('orderlist',$array);
+		$this->assign('step',$mystep);
+		
+		$this->display('qcs_status2');
+	}
+	
+	public function qcsstatusajax2() {
+		$keyid=I('post.option','','sql_filter');
+		$id = I('post.id','','sql_filter');
+		$status = I('post.status','','sql_filter');
+		$moduleId = I('post.moduleId','','sql_filter');
+		$orderNum = I('post.orderNum','','sql_filter');
+		$userId = I('post.userId','','sql_filter');
+		$username = I('post.userName','','sql_filter');
+		$openid = I('post.openId','','sql_filter');
+		$name=I('post.name','','sql_filter');
+		$step=M('artisans_update_order2')->where('ordernum='.$id)->find();
+		$idStr   = explode(',', $step['idStr']);
+		$typeStr = explode(',', $step['typeStr']);
+		$timeStr = explode(',', $step['timeStr']);
+		$key 	 = array_search($keyid, $idStr);
+		if($status=='yes') {
+			$typeStr[$key] = 0;
+		}else{
+			$typeStr[$key] = 1;
+		}
+		$timeStr[$key]=time();
+		$time=date('Y-m-d H:i');
+		if(!in_array(2, $typeStr)) {
+			$where['userId']   = $step['userId'];
+			$where['moduleId'] = $step['moduleId'];
+			$user = M('artisans_modules_user')->where($where)->find();
+			$servicenum['servicenum'] = $user['servicenum']+1;
+			$user = M('artisans_modules_user')->where($where)->save($servicenum);
+			$sid['id']=$step['moduleId'];
+			$user=M('artisans_user_baseinfo')->where($sid)->find();
+			$serviceNum['serviceNum']=$user['serviceNum']+1;
+			$user=M('artisans_user_baseinfo')->where($sid)->save($serviceNum);
+			$oid = M('artisans_order')->where(array('id'=>$orderNum))->save(array('status'=>4,'updateTime'=>array('exp','now()')));
+			if ($oid) {
+				$data=array(
+					"source"=>'800',
+					"openid"=>$openid,
+					"username"=>$username,
+					"create_time"=>date('Y-m-d H:i:s',time()),
+					"nick_name"=>$name,
+					"caseid"=>$orderNum
+				);
+				file_put_contents("/share/a.txt", date("Y-m-d H:i:s").serialize($data)."\r\n", FILE_APPEND);
+				$this->adddianping($data);
+			}
+		}
+		$data['idStr']=implode(',',$idStr);
+		$data['typeStr']=implode(',',$typeStr);
+		$data['timeStr']=implode(',',$timeStr);
+		$res=M('artisans_update_order2')->where('ordernum='.$id)->save($data);
+		if($res) {
+			echo json_encode(array('status'=>'200', 'time'=>$time));
+		}
 	}
