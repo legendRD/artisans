@@ -13,11 +13,11 @@ class ApiModel extends Model {
   private $_user_api_reg        = '/UserCenterApi/regUser';                       //用户中心api
   
   /**
-	 * 支付获取商品名
-	 * @param int $order_id	订单号id
-	 * @return mixed
-	 */
-	 public function getOrderShopInfo($order_id) {
+   * 支付获取商品名
+   * @param int $order_id	订单号id
+   * @return mixed
+   */
+  public function getOrderShopInfo($order_id) {
 	   if(empty($order_id)) {
 	     return false;
 	   }
