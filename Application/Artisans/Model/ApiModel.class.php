@@ -45,6 +45,68 @@ class ApiModel extends Model {
 		 unset($order_shop_info);
 		 return $tmp;
 	 }
-	 
-	 
+        
+        /*获取产品列表
+         *
+         *必传
+         *平台id PlatformId
+         *城市id CityId
+         *
+         *可传
+         *排序 1 正序 2 倒序 Sorting
+         *类型 查码表的类型  ClassType
+         *（是否分页）
+         *当前页	     page
+         *每页显示多少条产品 limit
+         */
+        public function getProductList($postData) {
+        	
+        	//拼接where条件
+        	$where['rela.PlatformId']  =  $postData['PlatformId'];
+		$where['rela.CityId']  =  $postData['CityId'];
+		
+		if(isset($postData['CityId']) && isset($postData['PlatformId'])) {
+			
+			//分类的筛选条件
+			if(isset($postData['ClassType'])) {
+				$where['rela.ClassType'] = $postData['ClassType'];
+			}
+			
+			//排序方式的筛选
+			if(isset($postData['Sorting']) && $postData['Sorting'] == 2) {
+				$order['rela.Sorting'] = 'desc';
+			}else{
+				$order['rela.Sorting'] = 'asc';
+			}
+			
+			$field[]   =   'rela.RelationshipId';
+			$field[]   =   'prd.ProductId';
+			$field[]   =   'prd.ProductName as name';
+			$field[]   =   'prd.ProductTitle as title';
+			$field[]   =   'prd.AddressInfo as addressInfo';
+			$field[]   =   'prd.LogoImgUrl as classImg';
+			$field[]   =   'prd.LogoImgCdnUrl as classImg_cdn';
+			$field[]   =   'prd.DetailImgUrl as headImg';
+			$field[]   =   'prd.DetailImgCdnUrl as headImg_cdn';
+			$field[]   =   'prd.ProductType as prdtype';
+			$field[]   =   'prd.Reserve1 as position';
+			$field[]   =   'prd.Price as proPrice';
+			
+			$where['prd.IsShelves']  =  1;
+			$where['prd.IsDelete']  =  0;
+			
+			if(isset($postData['limit']) && isset($postData['page'])) {
+				$return['count'] = M('prd_product_platform_city')->where($where)->order($order)->count();
+				$data = M('prd_product_platform_city as rela')
+					->join("left join prd_productinfo prd on prd.ProductId=rela.ProductId")
+					->where($where)
+					->order($order)
+					->field($field)
+					->page($postData['page'], $postData['limit'])
+					->select();
+			}else{
+				$data = M('')	
+			}
+		}
+        }
 }
