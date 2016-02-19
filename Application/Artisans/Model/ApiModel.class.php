@@ -105,7 +105,12 @@ class ApiModel extends Model {
 					->page($postData['page'], $postData['limit'])
 					->select();
 			}else{
-				$data = M('')	
+				$data = M('prd_product_platform_city as rela')
+					->join("left join prd_productinfo prd on prd.ProductId=rela.ProductId")
+					->where($where)
+					->field($field)
+					->order($order)
+					->select();
 			}
 		}
         }
