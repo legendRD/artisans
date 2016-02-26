@@ -243,6 +243,49 @@ class ApiModel extends Model {
         
         //获取产品活动Id
         public function getProActive($param) {
+        	$city_id = $param['city_id'];
+        	$pro_id  = $param['pro_id'];
+        	$now     = date('Y-m-d H:i:s');
+        	if(!($city_id && $pro_id)) {
+        		return false;
+        	}
+        	$where	= array(
+				'pap.ProductId'=>$pro_id,
+				'pac.CityId'=>$city_id,
+				'pa.IsDelete'=>0,
+				'pa.StartTime'=>array('gt',$now),
+				'pa.EndTime'=>array('lt',$now),
+		);
+		$field = 'ActiveName active_name,ActiveId active_id,Description description,ImgUrl img_url,ImgCdnUrl img_cdn_url,StartTime start_time,EndTime end_time,GroupWay group_way';
+		$active_info	= M()->table('prd_active_product  pap')
+				     ->join('left join prd_active_city pac on pap.ActiveId=pac.ActiveId')
+				     ->join('left join prd_active pa on pac.ActiveId=pa.ActiveId')
+				     ->where($where)
+				     ->field($field)
+				     ->select($field);
+		return $active_info;
+        }
+        
+        //获取用户拥有哪些优惠券
+        public function getUserCardInfo($param) {
         	
         }
+        
+        /**
+	 * 获取城市信息
+	 * @access public
+	 * @param  string/int $city	城市名/城市Id
+	 * @return boolean|unknown
+	 */
+	 public function getCityInfo($city) {
+	 	if(empty($city)) {
+	 		return false;
+	 	}
+	 	if(is_numeric($city)) {
+	 		$city_info = M('sys_city')->where("CityId=%d", $city)->find();
+	 	}else{
+	 		$city_info = M('sys_city')->where("CityName like '%s'", $city)->find();
+	 	}
+	 	return $city_info;
+	 }
 }
