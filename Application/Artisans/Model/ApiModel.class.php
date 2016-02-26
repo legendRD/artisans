@@ -112,6 +112,41 @@ class ApiModel extends Model {
 					->order($order)
 					->select();
 			}
+			if($data) {
+				foreach($data as $k=>$v) {
+					$attribute = M('prd_attribute')->where(array('RelationshipId'=>$v['RelationshipId']))->select();
+					foreach($attribute as $k1=>$v1) {
+						$attributeName = $v1['Attribute'];
+						$AttributeValeu = $v1['Value'];
+						$data[$k][$attributeName] = $AttributeValeu;
+					}
+				}
+				foreach($data as $k=>$v) {
+					//活动的查询
+					$where_pro['ProductId'] = $v['ProductId'];
+					$where_pro['StartTime'] = array('lt', date("Y-m-d H:i:s"));
+					$where_pro['EndTime']   = array('gt', date("Y-m-d H:i:s"));
+					$where_pro['IsDelete']  = 0;
+					$where_pro['IsUse']	= 1;
+					
+					//活动表筛选的字段
+					$field_pro[] = 'PromotionID';
+					$field_pro[] = 'ActivityPrice as endPrice';
+					$field_pro[] = 'Discount as discount';
+					$field_pro[] = 'StartTime as startTime';
+					$field_pro[] = 'EndTime as endTime';
+					
+					$promotion = M('prd_promotion')->where($where_pro)->field($field_pro)->find();
+					$data[$k]['promotion'] = $promotion;
+				}
+				$return['status'] = 200;
+				$return['msg']    = 'success';
+				$return['data']   = $data;
+			}
+		}else{
+			$return['status'] = 300;
+			$return['msg']    = '参数错误';
 		}
+		return $return;
         }
 }
