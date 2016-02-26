@@ -149,4 +149,100 @@ class ApiModel extends Model {
 		}
 		return $return;
         }
+        
+        //产品详情接口
+        public function getProductInfo($postData) {
+        	if(isset($postData['CityId']) && isset($postData['PlatformId']) && isset($postData['ProductId']))
+        	{
+        		$where['prd.IsShelves']  =  1;
+			$where['prd.IsDelete']   =  0;
+			$where['rela.ProductId']  =  $postData['ProductId'];
+			$where['rela.PlatformId']  =  $postData['PlatformId'];
+			$where['rela.CityId']  =  $postData['CityId'];
+			
+			$field[]   =   'rela.RelationshipId';
+			$field[]   =   'prd.ProductId';
+			$field[]   =   'prd.ProductName as name';
+			$field[]   =   'prd.ProductTitle as title';
+			$field[]   =   'prd.AddressInfo as addressInfo';
+			$field[]   =   'prd.LogoImgUrl as classImg';
+			$field[]   =   'prd.LogoImgCdnUrl as classImg_cdn';
+			$field[]   =   'prd.DetailImgUrl as headImg';
+			$field[]   =   'prd.DetailImgCdnUrl as headImg_cdn';
+			$field[]   =   'prd.ProductType as prdtype';
+			$field[]   =   'prd.Reserve1 as position';
+			$field[]   =   'prd.ProductIntroduction as proIntro';
+			$field[]   =   'prd.Promise as proMise';
+			$field[]   =   'prd.UserInstructions as userInstr';
+			$field[]   =   'prd.Description as description';
+			$field[]   =   'prd.Highlights as proSpecial';
+			$field[]   =   'prd.Advantage as proAdvan';
+			$field[]   =   'prd.ProductImgUrl1 as img1';
+			$field[]   =   'prd.ProductImgUrl2 as img2';
+			$field[]   =   'prd.ProductImgUrl3 as img3';
+			$field[]   =   'prd.ProductImgUrl4 as img4';
+			$field[]   =   'prd.ProductImgUrl5 as img5';
+			$field[]   =   'prd.ProductImgUrl6 as img6';
+			$field[]   =   'prd.ProductImgCdnUrl1 as cdn_img1';
+			$field[]   =   'prd.ProductImgCdnUrl2 as cdn_img2';
+			$field[]   =   'prd.ProductImgCdnUrl3 as cdn_img3';
+			$field[]   =   'prd.ProductImgCdnUrl4 as cdn_img4';
+			$field[]   =   'prd.ProductImgCdnUrl5 as cdn_img5';
+			$field[]   =   'prd.ProductImgCdnUrl6 as cdn_img6';
+			$field[]   =   'prd.Price as proPrice';
+			
+			$data  =  M('prd_product_platform_city as rela')
+				  ->join("left join prd_productinfo prd on prd.ProductId=rela.ProductId")
+				  ->where($where)
+				  ->field($field)
+				  ->find();
+				  
+			if($data) {
+				$attribute = M('prd_attribute')
+					     ->where(array('RelationshipId'=>$data['RelationshipId']))
+					     ->select();
+				foreach($attribute as $k1=>$v1) {
+					$attributeName = $v1['Attribute'];
+					$AttributeValeu = $v1['Value'];
+					$data[$attributeName] = $AttributeValeu;
+				}
+				
+				//活动的查询条件
+				$where_pro['ProductId'] = $data['ProductId'];
+				$where_pro['StartTime'] = array('lt', date("Y-m-d H:i:s"));
+				$where_pro['EndTime']   = array('gt', date("Y-m-d H:i:s"));
+				$where_pro['IsDelete']  = 0;
+				$where_pro['IsUse']	= 1;
+				
+				//活动表筛选的字段
+				$field_pro[]  =  'PromotionID';
+				$field_pro[]  =  'ActivityPrice as endPrice';
+				$field_pro[]  =  'Discount as discount';
+				$field_pro[]  =  'StartTime as startTime';
+				$field_pro[]  =  'EndTime as endTime';
+				
+				$promotion = M('prd_pomotion')
+					     ->where($where_pro)
+					     ->field($field_pro)
+					     ->find();
+				$data['promotion'] = $promotion;
+				
+				$return['status'] = 200;
+				$return['msg']    = 'success';
+				$return['data']   = $data; 
+			}else{
+				$return['status'] = 305;
+				$return['msg']	  = '未找到该产品';
+			}
+        	}else{
+        		$return['status'] = 300;
+			$return['msg']	  = '参数错误';
+        	}
+        	return $return;
+        }
+        
+        //获取产品活动Id
+        public function getProActive($param) {
+        	
+        }
 }
