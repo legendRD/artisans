@@ -423,7 +423,18 @@ class ApiModel extends Model {
 	 * @return mixed
 	 */
 	public function getOrderDate($param) {
-		
+		$order_date	= $param['order_date'];
+		$order_time_id	= $param['order_time_id'];
+		if(!($order_date && $order_time_id)) {
+			return false;
+		}
+		$time	= $this->getTime($order_time_id);
+		if($time) {
+			$date_time  = date('Y-m-d H:i:s',strtotime($order_date.' '.$time.':00'));
+			return $date_time;
+		}else{
+			return false;
+		}
 	}
 	
 	/**
@@ -460,6 +471,49 @@ class ApiModel extends Model {
 	}
 	
 	function clear_urlcan($url) {
+		$tmparr = parse_url($url);
+		$str = empty($tmparr['scheme'])?'http://':$tmparr['scheme'].'://';
+		$str.= $tmparr['host'].$tmparr['path'];
+		return $str;
+	}
+	
+	/**
+	 * 发送验证码
+	 * @param unknown $param
+	 * @return boolean
+	 */
+	public function sendVerifyCode($param) {
+		
+	}
+	
+	/**
+	 * 校验验证码
+	 * @param string $param['phone'] 手机号
+	 * @param string $param['verify_code'] 验证码
+	 * @param int	 $param['source'] 验证码来源 【0用户App,1XXXApp,2微信端，3pcweb端】
+	 * @return boolean|string
+	 */
+	public function checkVerify($param) {
+		
+	}
+	
+	/**
+	 * 绑定第三方用户
+	 * @access	public 
+	 * @param	string $username 第三方账号
+	 * @return	array 
+	 */
+	public function bindThirdUser($param) {
+		
+	}
+	
+	/**
+	 * 订单产能是否存在
+	 * @access public
+	 * @param  array $orderinfo	订单信息
+	 * @return boolean
+	 */
+	public function orderExistTime($orderinfo) {
 		
 	}
 }
