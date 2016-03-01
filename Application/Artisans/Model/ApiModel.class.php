@@ -268,7 +268,40 @@ class ApiModel extends Model {
         
         //获取用户拥有哪些优惠券
         public function getUserCardInfo($param) {
-        	
+        	$active_id_arr	= $param['active_id_arr'];
+		$uid		= $param['uid'];
+		if(!($active_id_arr && is_array($active_id_arr) && $uid)) {
+			return false;
+		}
+		$where = array(
+			'ActiveId'=>array('in', $active_id_arr),
+		);
+		$field = 'Codeid code_id, ActiveId active_id, Type type';
+		$active_item_info = M('prd_active_itme')->where($where)
+							->field($field)
+							->select();
+		foreach((array)$active_item_info as $value){
+			$active_item_info_s[$value['Type']][]	= $value['code_id'];
+		}
+		$card_info_s = array();
+		foreach((array)$active_item_info_s as $key=>$value) {
+			$where = array();
+			if($key == 0) {
+				//使用折扣
+			}elseif($key == 1) {
+				//使用卡券
+			}elseif($key == 2) {
+				//使用红包
+				$field	= 'MyRedId my_red_id,FromId from_id,ToId to_id,Money money,IsUse is_use';
+				$where = array(
+						'RedbagId'=>array('in',$value),
+						'ToId'=>$uid,
+				);
+				$card_info	= M('cut_myred')->where($where)->field($field)->select();
+				$card_info_s[$key] = $card_info;
+			}
+		}
+		return $card_info_s;
         }
         
         /**
@@ -288,4 +321,140 @@ class ApiModel extends Model {
 	 	}
 	 	return $city_info;
 	 }
+	 
+	 /**
+	 * 是否第一次下单
+	 * @access public
+	 * @param int $user_id	用户id
+	 * @param array $source_arr	订单来源
+	 * @return boolean|unknown
+	 */
+	public function isFirstOrder($user_id,$source_arr) {
+		if(empty($user_id)) {
+			return false;
+		}
+		if(!($source_arr && is_array($source_arr))) {
+			return false;
+		}
+		$where = array(
+				'UserId'=>$user_id,
+				'Source'=>array('in',$source_arr),
+				'Status'=>array('gt',1),
+		);
+		$count	= M('ord_orderinfo')->where($where)->count();
+		return $count;
+	}
+	
+	/**
+	 * XXX某个时间产能信息
+	 * @param int $user_id	  XXXid
+	 * @param int $order_date 预约日期
+	 * @param int $order_time_id 预约时间Id
+	 * @return mixed
+	 */
+	public function getCapacity($user_id,$order_date,$order_time_id) {
+		if(!($user_id && $order_date && $order_time_id)) {
+			return false;
+		}
+		$capacity_info	= M('crt_capacity')->where("Capacity='%s' and CraftsmanId = %d and TimeId = %d", $order_date, $user_id, $order_time_id)
+						   ->find();
+		return $capacity_info;
+	}
+	
+	/**
+	 * 判断XXX产能是否存在
+	 * @param int $user_id	  XXXid
+	 * @param int $order_date 预约日期
+	 * @param int $order_time_id 预约时间Id
+	 * @return boolean
+	 */
+	 public function isCapacity($user_id,$order_date,$order_time_id) {
+	 	if(!($user_id && $order_date && $order_time_id)) {
+	 		return false;
+	 	}
+	 	$capacity_num	= M('crt_capacity')->where("Capacity='%s' and CraftsmanId=%d and TimeId=%d",$order_date,$user_id,$order_time_id)->getField('NouseNum');
+	 	if($capacity_num>0) {
+			return true;
+		}else{
+			return false;
+		}
+	 }
+	 
+	 /**
+	 * 减产能
+	 * @access public
+	 * @param int $capacity_id
+	 * @return mixed
+	 */
+	 public function reduceCapacity($capacity_id) {
+	 	if(!($capacity_id && is_numeric($capacity_id))) {
+	 		return false;
+	 	}
+	 	$sql = " update crt_capacity set NouseNum=NouseNum-1 where CapacityId=".$capacity_id." and NouseNum>0 ";
+	 	$id = M()->execute($sql);
+	 	return $id;
+	 }
+	 
+	 /**
+	 * 获取第三方用户信息
+	 * @access public
+	 * @param  array  用户信息
+	 * @return mixed
+	 */
+	public function getThirdUserInfo($param) {
+		
+	}
+	
+	/**
+	 * 获取用户信息
+	 * @access public
+	 * @param  int  用户Id
+	 * @return mixed
+	 */
+	public function getUserInfo($uid) {
+		
+	}
+	
+	/**
+	 * 获取datetime
+	 * @access public
+	 * @param  date	$param['order_date']	预约日期
+	 * @param  int	$param['order_time_id']	时间Id
+	 * @return mixed
+	 */
+	public function getOrderDate($param) {
+		
+	}
+	
+	/**
+	 * 获取time
+	 * @access public
+	 * @param  int	$order_time_id	时间Id
+	 * @return mixed
+	 */
+	public function getTime($order_time_id) {
+		if(!$order_time_id) {
+			return false;
+		}
+		$time	= M('prd_servicetime')->where(" IsDelete=0 and TimeId=%d",$order_time_id)->getField('StartTime');
+		return trim($time);
+	}
+	
+	//数据过滤  删除空格
+	public function trimall($str) {
+		$qian[] =" ";
+		$qian[] ="\t";
+		$qian[] ="\n";
+		$qian[] ="\r";
+		$qian[]="http://localhost/weixin/index.php/";
+		$qian[]="http://localhost/wxuat/index.php/";
+		$qian[]="http://localhost/weixin1.1/weixin_1.1/index.php/";
+		$qian[]="http://localhost/artisans_1.1/index.php/Artisans/Craft";
+		$qian[]="http://localhost/artisans_test/index.php/Artisans/Craft";
+		$qian[]="lat=";
+		$qian[]="lnt=";
+		$qian[]="forWho=";
+		
+		$hou = array_fill
+	}
 }
