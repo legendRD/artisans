@@ -455,6 +455,11 @@ class ApiModel extends Model {
 		$qian[]="lnt=";
 		$qian[]="forWho=";
 		
-		$hou = array_fill
+		$hou = array_fill(0, count($qian), "");
+		return str_replace($qian, $hou, $str);
+	}
+	
+	function clear_urlcan($url) {
+		
 	}
 }
