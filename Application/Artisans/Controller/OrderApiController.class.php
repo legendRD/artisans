@@ -121,4 +121,58 @@ class OrderApiController extends CommonController {
 		}
 		return $this->returnJsonData($exit_type,200,$data);
 	}
+	
+	//多个订单信息
+	public function getMoreOrder($param=null) {
+		if(isset($param)) {
+			$post_data	= $param;
+			$exit_type	= 'array';
+		}else {
+			$post_data	= I('request.');
+			$exit_type	= 'json';
+		}
+		$user_id	= $post_data['user_id'];
+		$current_page	= $post_data['current_page']?	(int)$post_data['current_page']:1;
+		$page_size	= $post_data['page_size']?		(int)$post_data['page_size']:10;
+		if(!($user_id && $current_page && $page_size)) {
+			return $this->returnJsonData($exit_type,300);
+		}
+		if(!$this->_access_token) {
+			return $this->returnJsonData($exit_type,10000);
+		}
+		$where = array(
+				'UserId'=>$user_id,
+		);
+		$total_size	= M('ord_orderinfo')->where($where)->count();
+		$total_page	= ceil($total_size/$page_size);
+		$total_page	= $total_page>0? $total_page:1;
+		$data	= array();
+		if($total_size>0) {
+			$order_info	= M('ord_orderinfo')->where($where)->order('CreaterTime desc ')->limit(($current_page-1)*$page_size,$page_size)->select();
+			foreach($order_info as $value) {
+				$tmp	= array();
+				$tmp['order_id']	= (int)$value['OrderId'];
+				$tmp['vmall_id']	= (string)$value['VmallOrderId'];
+				$tmp['name']		= (string)$value['Name'];
+				$tmp['status']		= (int)$this->getOrderStatus($value['Status']);
+				$tmp['phone']		= (string)$value['Phone'];
+				$tmp['service_date']= (string)$value['ReservationTime'];
+				$tmp['address']		= (string)$value['Address'];
+				$tmp['craft_name']	= (string)$value['CraftsmanName'];
+				$tmp['craft_id']	= (int)$value['CraftsmanId'];
+				$shop_info			= $this->getOrderShopInfo($value['OrderId']);
+				$tmp['pro_name']	= (string)$shop_info['shop_name'];
+				$tmp['pro_id']		= (int)$shop_info['shop_id'];
+				$tmp['price']		= (string)$value['Price'];
+				$tmp['pay_way']		= (string)$value['PayWay'];
+				$data[]	= $tmp;
+			}
+		}
+		return $this->returnJsonData($exit_type,200,$data);
+	}
+	
+	//创建订单
+	public function createOrder($param=null) {
+		
+	}
 }
