@@ -175,4 +175,11 @@ class OrderApiController extends CommonController {
 	public function createOrder($param=null) {
 		
 	}
+	
+	//核销卡券，发送消息
+	private function _paySuccessDeal($param){
+		$pay_api_model	= D('PayApi');
+		$pay_api_model->cleanKQ($param); //核销卡券
+		$pay_api_model->sendMsg($param); //发送消息
+	}
 }
