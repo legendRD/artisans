@@ -483,7 +483,34 @@ class ApiModel extends Model {
 	 * @return boolean
 	 */
 	public function sendVerifyCode($param) {
-		
+		$phone = $param['phone'];
+		$code  = $param['code'];	//验证码
+		$create_time = $param['create_time'];
+		$lose_time = $param['lose_time'];	//失效时间
+		$content = $param['conten'];
+		if(!($phone && $code && $create_time && $lose_time && $content)) {
+			return false;
+		}
+		$source = $param['source'];
+		$where = array(
+			'Phone'=>$phone,
+			'Captcha'=>$code,
+			'CreaterTime'=>$create_time,
+			'LoseTime'=>$lose_time,
+			'Source'=>$source
+		);
+		$id = M('cut_captcha')->add($data);
+		if($id) {
+			$send_short_msg['source'] = $source;
+			$send_short_msg['phone']  = $phone;
+			$send_short_msg['content']= $content;
+			$send_short_msg['url']    = $this->_shortmsg_verifycode.date('Ymd').'.log';
+			D('Comm')->sendShortMsg2($send_short_msg);
+			unset($send_short_msg);
+			return true;
+		}else{
+			return false;
+		}
 	}
 	
 	/**
@@ -494,7 +521,27 @@ class ApiModel extends Model {
 	 * @return boolean|string
 	 */
 	public function checkVerify($param) {
-		
+		$phone = $param['phone'];
+		$verify_code = $param['verify_code'];
+		$source = $param['source'];
+		if(!($phone && $verify_code && $source)) {
+			return false;
+		}
+		$where = array(
+			'Phone'  =>$phone,
+			'Captcha'=>$verify_code,
+			'Source' =>$source
+		);
+		$edate = M('cut_captcha')->where($where)->getField('LoseTime');
+		if($edate) {
+			$second = time()-strtotime($edate);
+			if($second<0) {
+				return true;
+			}else{
+				return 'timeout';
+			}
+		}
+		return false;
 	}
 	
 	/**
@@ -504,7 +551,33 @@ class ApiModel extends Model {
 	 * @return	array 
 	 */
 	public function bindThirdUser($param) {
-		
+		$source_from = $param['source_from'];
+		$username    = $param['username'];
+		if(!($username && $source_from)) {
+			return false;
+		}
+		$user_info = M('cut_uid_thirdname')->where(" ThirdName='%s'", $username)->find();
+		if(empty($user_info)) {
+			$base_info_s = array(
+				'source_from'=>$source_from,
+				'user_type'  =>'other',
+				'type'	     =>200,
+				'username'   =>$username,
+			);
+			$user_center_info 	  = send_curl(C('ArtisansApi').$this->_user_api_reg, $base_info_s);
+			$parse_data	  	  = json_decode($user_center_info, true);
+			$user_info['ThirdName']   = $username;
+			$user_info['CreaterTime'] = date('Y-m-d H:i:s');
+			if(!$parse_data['data']['uid']) {
+				$user_info['UserId'] = 0;
+				wlog('/share/weixinLog/artisans/user_center_api/no_find_uid.log', $username);	//调用用户中心接口，获取不到用户openid
+				wlog('/share/weixinLog/artisans/user_center_api/no_find_uid.log', $parse_data);
+			}else{
+				$user_info['UserId'] = $parse_data['data']['uid'];
+				M('cut_uid_thirdname')->add($user_info);
+			}
+		}
+		return $user_info;
 	}
 	
 	/**
@@ -514,6 +587,21 @@ class ApiModel extends Model {
 	 * @return boolean
 	 */
 	public function orderExistTime($orderinfo) {
-		
+		$reservation_time = $orderinfo['ReservationTime'];
+		//判断预约时间是否过期，小于3小时过期
+		if((strtotime($reservation_time)-10800) < time() || !$reservation_time) {
+			return false;
+		}
+		//订单创建时间超过15分钟，过期
+		if(strtotime($orderinfo['CreaterTime']) + 900 < time()) {
+			return false;
+		}
+		$capacity_id = $orderinfo['CapacityId'];
+		$time_num    = M('crt_use')->where(array('CapacityId'=>$capacity_id))->count();
+		if($time_num==1) {
+			return true;
+		}else{
+			return false;
+		}
 	}
 }
