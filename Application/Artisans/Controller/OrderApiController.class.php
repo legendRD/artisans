@@ -54,4 +54,71 @@ class OrderApiController extends CommonController {
     	$data['access_token'] = $access_token;
     	$this->returnJsonData(200, $data);
     }
+    
+    	//单个订单信息
+	public function getOneOrder($param=null){
+		if(isset($param)){
+			$post_data	= $param;
+			$exit_type	= 'array';
+		}else{
+			$post_data	= I('request.');
+			$exit_type	= 'json';
+		}
+		$order_id	= $post_data['order_id'];
+		if(!$order_id) {
+			return $this->returnJsonData($exit_type,300);
+		}
+		if(!$this->_access_token) {
+			return $this->returnJsonData($exit_type,10000);
+		}
+		$where = array(
+				'OrderId'=>$order_id,
+		);
+		if($post_data['phone']) {
+			$where['Phone'] = $post_data['phone'];
+		}
+		$order_info	= M('ord_orderinfo')->where($where)->find();
+		$data	= array();
+		if($order_info['OrderId']) {
+			$artisans_model		= D('Artisans');
+			$data['order_id']	= (int)$order_info['OrderId'];
+			$data['vmall_id']	= (string)$order_info['VmallOrderId'];
+			$data['name']		= (string)$order_info['Name'];
+			$data['status']		= (int)$this->getOrderStatus($order_info['Status']);
+			$data['phone']		= (string)$order_info['Phone'];
+			$data['service_date']	= (string)$order_info['ReservationTime'];
+			$data['address']	= (string)$order_info['Address'];
+			if($order_info['PayWay'] == 1 && !$order_info['CraftsmanId']){
+				$data['craft_name']	= 'XXXXX';
+			}else{
+				$data['craft_name']	= (string)$order_info['CraftsmanName'];
+			}
+			$data['craft_id']	= (int)$order_info['CraftsmanId'];
+			$shop_info	= $artisans_model->getOrderShopInfo($order_info['OrderId']);
+			$data['pro_name']	= (string)$shop_info['shop_name'];
+			$data['pro_id']	= (int)$shop_info['shop_id'];
+			$data['price']	= (string)$order_info['Price'];
+			$data['openid']	= (string)$order_info['UserOpenid'];
+			$data['user_id']= $order_info['UserId'];
+			$data['pay_way']= $order_info['PayWay'];
+			$data['pay_process']= $order_info['PayProcess'];
+			$craft_info	= M('crt_craftsmaninfo')->where(array('CraftsmanId'=>$order_info['CraftsmanId']))->find();
+			$data['craft_username']	= (string)$craft_info['UserName'];
+			$data['craft_photo']	= $craft_info['HeadImgUrl']? I('server.HTTP_HOST').$craft_info['HeadImgUrl']:'';
+			$data['comments']	= array();
+			if($order_info['Status'] == 7) {
+				//订单评论
+				$comment_info	= M('prd_evaluation')->where(array('OrderId'=>$order_info['OrderId']))->select();
+				foreach($comment_info as $value){
+					$tmp['content']= (string)$value['Comments'];
+					$tmp['stars']	= (int)$value['StarNums'];
+					$tmp['label']	= (string)$value['Label'];
+					$tmp['create_time']	= (string)$value['CreaterTime'];
+					$tmp['source_from']	= (int)$value['Source'];
+					$data['comments'][]	= $tmp;
+				}
+			}
+		}
+		return $this->returnJsonData($exit_type,200,$data);
+	}
 }
