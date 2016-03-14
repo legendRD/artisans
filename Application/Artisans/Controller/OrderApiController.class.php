@@ -269,14 +269,12 @@ class OrderApiController extends CommonController {
 		$data['NickName']	= $register_info['username'];
 		$data['Name']		= $order_name;
 		$data['CityName']	= $city_name;
-		
 		//客服导购和远程服务地址都为ip
 		if($pay_process == 3 || $pay_process == 2) {
 			$data['Address']	= $ip;
 		}else{
 			$data['Address']	= $address;
 		}
-		
 		$data['Phone']		= $order_phone;
 		$data['ReservationTime']= $reservation_time? $reservation_time:Null;
 		$data['ForWho']		= $for_who;
@@ -291,7 +289,7 @@ class OrderApiController extends CommonController {
 		
 		//产品激励Id
 		if($pro_id) {
-			$pro_reward_id = M('prd_product_reward')->where(" State=0 and ProductId=%d ", $pro_id)->find('Id');
+			$pro_reward_id = M('prd_product_reward')->where(" State=0 and ProductId=%d ", $pro_id)->getField('Id');
 		}
 		$data['ProductRewardId'] = $pro_reward_id? $pro_reward_id:0;
 		
@@ -303,8 +301,7 @@ class OrderApiController extends CommonController {
 			$product_info_data['ProductId']  = $pro_id;
 			
 			$pro_info	= A('Api')->getProductInfo($product_info_data);
-			
-			$pro_info_s = $pro_info['data'];
+			$pro_info_s     = $pro_info['data'];
 			if($pro_info_s['promotion']) {
 				$price = $pro_info_s['promotion']['endPrice'];
 			}else{
@@ -318,9 +315,9 @@ class OrderApiController extends CommonController {
 					if($count == 0) {
 						$price = ($price-5)<0? 0:($price-5);
 					}
-				}else{
-					return $this->returnJsonData($exit_type, 2003);
 				}
+			}else{
+				return $this->returnJsonData($exit_type, 2003);
 			}
 			
 			//用户是否使用卡券
@@ -335,6 +332,170 @@ class OrderApiController extends CommonController {
 			}
 			
 			//用户是否使用优惠券
+			$is_use_coupons = false;
+			if($is_use_card === false && $coupons_id) {
+				$coupons_info = array(
+					'source'     => 1,	      //来源 58同城
+					'phone'      => $order_phone, 
+					'coupons_id' => $coupons_id, 
+					'pro_id'     => $pro_id
+				);
+				$activity_data = $pay_api_model->getUserCouponsinfo($coupons_info);
+				if($activity_data['money']>0) {
+					$price = $price - $activity_data['money'];
+					$price = $price>0?$price:0;
+					$is_use_coupons = true;
+				}
+			}
+			
+			//上门费
+			$craft_param = array(
+				'CraftsmanId' => $craft_id,
+				'lat'	      => $lat,
+				'lng'	      => $lng
+			);
+			$craft_info_s = A('Api')->getCraftsManInfo($craft_param);
+			$trave_price  = ceil($craft_info_s['data']['Distance']*2);
+			$trave_price  = $trave_price>0?$trave_price:0;
+			unset($craft_info_s);
+			
+			if(($trave_price>80 || empty($craft_id)) && (in_array($pay_process, array(1, 4))) {
+				$trave_price = 80;
+			}
+			if($pay_way == 1) {
+				//线下支付  需要加上门费
+				$price = $price + $trave_price;
+				$data['DoorFee'] = $trave_price;
+			}else{
+				$data['DoorFee'] = 0;
+			}
+			if($pay_process	== 2) {
+				//客服导购,价格走其它产品表
+				$shop_info = M('prd_shopinfo')->where(array('shopid'=>$pro_id, 'shop_status'=>1))->find();
+				if(!$shop_info) {
+					return $this->returnJsonData($exit_type, 10006);
+				}
+				$price = $shop_info['shop_price'] ? $shop_info['shop_price'] : 300;
+			}
+			$create_time = date('Y-m-d H:i:s');	//订单创建时间
+			$data['CreaterTime'] = $create_time;
+			$data['IsDelete']    = 0;
+			$data['Price']       = $price;
+			
+			//微信正常支付需要判断产能是否存在
+			if($pay_process == 1) {
+				$yuyuetime = strtotime($reservation_time);
+				if($yuyuetime<time() || $yuyue_time-time()<10800) {
+					return $this->returnJsonData($exit_type, 1001);
+				}
+				$capacity_info = $artisans_model->getCapacity($craft_id, $order_data, $order_time_id);
+				$no_use_num		= $capacity_info['NouseNum'];
+				$capacity_id		= $capacity_info['CapacityId'];
+				$data['CapacityId']	= $capacity_id;
+				if(empty($no_use_num) || $no_use_num<0) {
+					return $this->returnJsonData($exit_type, 1001);
+				}
+			}
+			
+			//微信端订单号自己生成，其他系统订单都由vmall提供订单
+			if($source == 0) {
+				$out_trade_no = $data['VmallOrderId'] = create_order_id();
+			}
+			
+			//判断差能是否被占用
+			if($pay_process == 1) {
+				$time_num = M('crt_use')->where()->count();
+				if($time_num > 0) {
+					return $this->returnJsonData($exit_type, 1000);
+				}
+			}
+			
+			//价格为0
+			if($price == 0) {
+				$data['Status'] = 3;
+			}
+			
+			//开启回滚
+			$trans_model  = M();
+			$trans_model->startTrans();
+			$trans_status = true;
+			
+			if($pay_process == 1) {
+				$trans_status = $artisans_model->reduceCapacity($capacity_id);	//减产能
+				if($trans_status) {
+					$trans_status = M('crt_use')->add(array('CapacityId'=>$capacity_id, 'UserId'=>$register_info['UserId'], 'CreaterTime'=>$create_time));
+				}
+			}
+			if($trans_status) {
+				$trans_status    = M('ord_orderinfo')->add($data);	//订单基本信息
+				$data['OrderId'] = $trans_status;
+			}
+			if($trans_status) {
+				$order_id 				= $trans_status;
+				$order_status_info['order_id'] 		= $order_id;
+				$order_status_info['state']		= $data['Status'];
+				$order_status_info['create_time']	= $create_time;
+				
+				$trans_status = D('PayApi')->addOrderState($order_status_info);	//订单状态
+				unset($order_status_info);
+			}
+			if($trans_status) {
+				if($is_use_card) {
+					$ord_pay_data['OrderId']	= $order_id;
+					$ord_pay_data['PayWay']		= 1; 								//卡券
+					$ord_pay_data['PayCode']	= $card_info_data['codeid'].','.$card_info_data['cardid'];
+					$ord_pay_data['PayCash']	= $redbag_data['money'];
+					$ord_pay_data['CreaterTime']	=$create_time;
+					
+					$trans_status = M('ord_pay')->add($ord_pay_data);	//订单支付明细【卡券信息】
+					unset($ord_pay_data);
+					$code_pay_way = 1;
+				}elseif($is_use_coupons) {
+					$ord_pay_data['OrderId']	= $order_id;
+					$ord_pay_data['PayWay']		= 3; //优惠券
+					$ord_pay_data['PayCode']	= $coupons_id;
+					$ord_pay_data['PayCash']	= $activity_data['money'];
+					$ord_pay_data['CreaterTime']	=$create_time;
+					
+					$trans_status	= M('ord_pay')->add($ord_pay_data);	//订单支付明细【优惠券信息】
+					unset($ord_pay_data);
+					$code_pay_way	= 3;
+				}
+			}
+			if($trans_status) {
+				if($pay_process	== 2) {
+					$addpackage['product_id']	= $shop_info['shop_id'];
+					$addpackage['product_name']	= $shop_info['shop_name'];
+					$addpackage['product_price']    = $shop_info['shop_price'];
+				}else{
+					$addpackage['product_id']	= $pro_info_s['ProductId'];
+					$addpackage['product_name']	= $pro_info_s['name'];
+					$addpackage['product_price']    = $price;
+				}
+				$addpackage['order_id']		= $order_id;
+				$addpackage['package_id']	= $package_id;
+				
+				$trans_status  =  $this->addPackage($addpackage);	//订单套餐明细
+				unset($addpackage);
+			}
+			if($trans_status) {
+				$trans_model->commit();
+				$new_data['order_id']		= $data['OrderId'];
+				$new_data['vmall_order_id']	= $data['VmallOrderId'];
+				return $this->returnJsonData($exit_type,200,$new_data);
+			}else{
+				$trans_model->rollback();
+				if($post_data['no']) {
+					$order_info = M('ord_orderinfo')->where(" sunshine_id='%s' ", $post_data['no'])->find();
+				}
+				if($order_info['OrderId'] && $order_info['VmallOrderId']) {
+					$new_data['order_id']		= $order_info['OrderId'];
+					$new_data['vmall_order_id']	= $order_info['VmallOrderId'];
+					return $this->returnJsonData($exit_type,200,$new_data);
+				}else{
+					return $this->returnJsonData($exit_type,2007,array(),'创建订单失败');
+				}
+			}
 		}
 	}
 	
