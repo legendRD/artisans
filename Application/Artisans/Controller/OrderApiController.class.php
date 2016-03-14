@@ -256,6 +256,86 @@ class OrderApiController extends CommonController {
 		$data['CraftsmanId']		= $craft_id;
 		$data['CraftsmanOpenid']	= $craft_info['Openid'];
 		
+		if($pay_process	== 2) { 
+			$data['CraftsmanName']	= $enginner_name;							//客服导购，客服用户名放入CraftsmanName
+		}else{
+			$data['CraftsmanName']	= $craft_info['TrueName'];
+		}
+		
+		/*$data['UserId']	= $register_info['uid'];
+		$data['UserOpenid']	= $register_info['other'];*/
+		$data['UserId']		= $user_id;
+		$data['UserOpenid']	= $post_data['openid'];
+		$data['NickName']	= $register_info['username'];
+		$data['Name']		= $order_name;
+		$data['CityName']	= $city_name;
+		
+		//客服导购和远程服务地址都为ip
+		if($pay_process == 3 || $pay_process == 2) {
+			$data['Address']	= $ip;
+		}else{
+			$data['Address']	= $address;
+		}
+		
+		$data['Phone']		= $order_phone;
+		$data['ReservationTime']= $reservation_time? $reservation_time:Null;
+		$data['ForWho']		= $for_who;
+		$data['ShortMessage']	= $wish;
+		$data['Source']		= $source;
+		$data['AddressId']	= $address_id;
+		$data['Lat']		= $lat;
+		$data['Lng']		= $lng;
+		$data['AddressId']	= $address_id;
+		$data['PayWay']		= $pay_way;
+		$data['PayProcess']	= $pay_process;
+		
+		//产品激励Id
+		if($pro_id) {
+			$pro_reward_id = M('prd_product_reward')->where(" State=0 and ProductId=%d ", $pro_id)->find('Id');
+		}
+		$data['ProductRewardId'] = $pro_reward_id? $pro_reward_id:0;
+		
+		//获取产品价格
+		$price	= 200; //默认产品价格
+		if($pro_id && $pay_process <> 2) {
+			$product_info_data['CityId']	 = $city_id;
+			$product_info_data['PlatformId'] = $plat_from_id;
+			$product_info_data['ProductId']  = $pro_id;
+			
+			$pro_info	= A('Api')->getProductInfo($product_info_data);
+			
+			$pro_info_s = $pro_info['data'];
+			if($pro_info_s['promotion']) {
+				$price = $pro_info_s['promotion']['endPrice'];
+			}else{
+				$price = $pro_info_s['Price'];
+			}
+			unset($pro_info, $product_info_data);
+			if($pro_info_s && in_array($pro_info_s)) {
+				if(in_array($source, array(2, 3)) {
+					//app首单减5元
+					$count = $artisans_model->isFirstOrder($register_info['uid'], array(2, 3));
+					if($count == 0) {
+						$price = ($price-5)<0? 0:($price-5);
+					}
+				}else{
+					return $this->returnJsonData($exit_type, 2003);
+				}
+			}
+			
+			//用户是否使用卡券
+			$pay_api_model = D('PayApi');
+			$redbag_data   = $pay_api_model->getUserCardinfo($card_info_data);
+			if($redbag_data['id']) {
+				$price	= $price - $redbag_data['money'];
+				$price	= $price>0? $price:0;
+				$is_use_card	= true;
+			}else{
+				$is_use_card	= false;
+			}
+			
+			//用户是否使用优惠券
+		}
 	}
 	
 	//核销卡券，发送消息
