@@ -34,6 +34,10 @@ class OrderApiController extends CommonController {
     private $_craft_step	= array(1,2,3,4,5,6); //XXX服务流程
     private $_scrypt_pwd	= '';
     
+    //域名
+    private $string  ='';
+    private $string0 ='';
+    
     public function _initialize() {
 	   $access_token	= I('request.access_token');
 	   $this->_access_token	= D("Token")->checkAccessToken($access_token);	//检测token
@@ -354,11 +358,13 @@ class OrderApiController extends CommonController {
 				'lat'	      => $lat,
 				'lng'	      => $lng
 			);
+			
 			$craft_info_s = A('Api')->getCraftsManInfo($craft_param);
 			$trave_price  = ceil($craft_info_s['data']['Distance']*2);
 			$trave_price  = $trave_price>0?$trave_price:0;
 			unset($craft_info_s);
 			
+			//上门费超过80元 或者 XXXid为空【正常支付或者40公里】
 			if(($trave_price>80 || empty($craft_id)) && (in_array($pay_process, array(1, 4))) {
 				$trave_price = 80;
 			}
@@ -388,7 +394,7 @@ class OrderApiController extends CommonController {
 				if($yuyuetime<time() || $yuyue_time-time()<10800) {
 					return $this->returnJsonData($exit_type, 1001);
 				}
-				$capacity_info = $artisans_model->getCapacity($craft_id, $order_data, $order_time_id);
+				$capacity_info 		= $artisans_model->getCapacity($craft_id, $order_data, $order_time_id);
 				$no_use_num		= $capacity_info['NouseNum'];
 				$capacity_id		= $capacity_info['CapacityId'];
 				$data['CapacityId']	= $capacity_id;
@@ -426,6 +432,7 @@ class OrderApiController extends CommonController {
 					$trans_status = M('crt_use')->add(array('CapacityId'=>$capacity_id, 'UserId'=>$register_info['UserId'], 'CreaterTime'=>$create_time));
 				}
 			}
+			
 			if($trans_status) {
 				$trans_status    = M('ord_orderinfo')->add($data);	//订单基本信息
 				$data['OrderId'] = $trans_status;
@@ -442,7 +449,7 @@ class OrderApiController extends CommonController {
 			if($trans_status) {
 				if($is_use_card) {
 					$ord_pay_data['OrderId']	= $order_id;
-					$ord_pay_data['PayWay']		= 1; 								//卡券
+					$ord_pay_data['PayWay']		= 1; //卡券
 					$ord_pay_data['PayCode']	= $card_info_data['codeid'].','.$card_info_data['cardid'];
 					$ord_pay_data['PayCash']	= $redbag_data['money'];
 					$ord_pay_data['CreaterTime']	=$create_time;
@@ -455,7 +462,7 @@ class OrderApiController extends CommonController {
 					$ord_pay_data['PayWay']		= 3; //优惠券
 					$ord_pay_data['PayCode']	= $coupons_id;
 					$ord_pay_data['PayCash']	= $activity_data['money'];
-					$ord_pay_data['CreaterTime']	=$create_time;
+					$ord_pay_data['CreaterTime']	= $create_time;
 					
 					$trans_status	= M('ord_pay')->add($ord_pay_data);	//订单支付明细【优惠券信息】
 					unset($ord_pay_data);
@@ -476,26 +483,40 @@ class OrderApiController extends CommonController {
 				$addpackage['package_id']	= $package_id;
 				
 				$trans_status  =  $this->addPackage($addpackage);	//订单套餐明细
-				unset($addpackage);
 			}
-			if($trans_status) {
-				$trans_model->commit();
-				$new_data['order_id']		= $data['OrderId'];
-				$new_data['vmall_order_id']	= $data['VmallOrderId'];
-				return $this->returnJsonData($exit_type,200,$new_data);
-			}else{
-				$trans_model->rollback();
-				if($post_data['no']) {
-					$order_info = M('ord_orderinfo')->where(" sunshine_id='%s' ", $post_data['no'])->find();
-				}
-				if($order_info['OrderId'] && $order_info['VmallOrderId']) {
-					$new_data['order_id']		= $order_info['OrderId'];
-					$new_data['vmall_order_id']	= $order_info['VmallOrderId'];
-					return $this->returnJsonData($exit_type,200,$new_data);
+			
+			//调取vmall订单接口
+			if($trans_status && $source<>0) {
+				$tmp['product_name']	= $pro_info_s['name'];
+				$pro_img		= $this->getImgUrl($pro_info_s['headImg_cdn'],$pro_info_s['headImg']);
+				if(strpos($pro_img, $string)===false) {
+					$tmp['product_pic'] = $pro_img;
 				}else{
-					return $this->returnJsonData($exit_type,2007,array(),'创建订单失败');
+					$tmp['product_pic'] = str_replace($string, $string0, $pro_img);  //XXX头像替换
 				}
-			}
+				$tmp['count'] 		= 1;
+				$tmp['product_price']	= $data['Price'];
+				$shop['total_amount']	= $data['Price'];
+				$shop['shop_id']	= $pro_id;
+				$shop['address']	= $address;
+				$shop['uid'] 		= $order_id;
+				$shop['allnum'] 	= 1;
+				$shop['good_arr'][] 	= $tmp;
+				$shop['order_from'] 	= 200;
+				
+				$get_trade_info = post_http($this->_getTrade_url, $shop); //获取订单号接口
+				$trade_info     = json_decode($get_trade_info, true);
+				unset($shop);
+				if($trade_info['data'] && is_array($trade_info['data'])) {
+					$post_id 	= $trade_info['data']['uid'];	//记录id
+					$out_trade_no   = $trade_info['data']['order_id'];
+					$data['VmallOrderId']	= $out_trade_no;
+					if($out_trade_no && $post_id) {
+						$trans_status = M('ord_orderinfo')->where(array('OrderId'=>$post_id))->save(array('VmallOrderId'=>$out_trade_no, 'UpdateTime'=>date('Y-m-d H:i:s')));
+					}
+				}else{
+					$trans_status	= false;
+				}
 		}
 	}
 	
