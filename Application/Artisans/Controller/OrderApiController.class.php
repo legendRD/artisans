@@ -194,6 +194,33 @@ class OrderApiController extends CommonController {
 		$lat		= $post_data['lat'];
 		$lng		= $post_data['lng'];
 		
+		$time_data['order_date']    = $order_date    = $post_data['order_date'];
+		$time_data['order_time_id'] = $order_time_id = $post_data['order_time_id'];
+		
+		$card_info_data['codeid'] = $post_data['order_codeid'];	//卡券
+		$card_info_data['cardid'] = $post_data['order_cardid'];
+		$card_info_data['openid'] = $post_data['openid'];
+		
+		$pay_way	= $post_data['pay_way'];	//array(1=>'线下支付',2=>'微信系统微信支付',3=>'vmall微信支付',4=>'vmall支付宝支付');
+		$package_id	= $post_data['package_id']; 	//套餐id
+		
+		$pay_process	= $post_data['pay_process'];	//支付流程：1正常支付，2客服引导，3客服专家在线，4.距离大于40公里支付
+		$ip		= $post_data['ip'];		//客服专家在线,订单表中address存用户ip
+		$enginner_name	= $post_data['enginner_name']; //客服用户名
+		
+		$data['IndexSource'] = $post_data['index_source']; //首页来源
+		
+		$coupons_id	= $post_data['coupons_id'];
+		
+		$artisans_model = D('Api');
+		$reservation_time = $artisans_model->getOrderDate($time_data);
+		
+		if(!($user_id && $for_who && $city_id && $source && $pay_process && $pay_way)) {
+			return $this->returnJsonData($exit_type, 300);
+		}
+		if(!in_array($source, $this->_source_from)) {
+			$this->returnJsonData($exit_type,2001);
+		}
 	}
 	
 	//核销卡券，发送消息
