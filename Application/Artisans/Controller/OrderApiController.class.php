@@ -517,7 +517,34 @@ class OrderApiController extends CommonController {
 				}else{
 					$trans_status	= false;
 				}
-		}
+			}
+			
+			if($trans_status) {
+				$trans_model->commit();
+				//线下支付 或者 支付金额为0 ： 核销卡券并给用户发送消息
+				if( $data['Price'] == 0 || $pay_way==1 ) {
+					$pay_success_data			= $data;
+					$pay_success_data['cardid']		= $card_info_data['cardid'];
+					$pay_success_data['codeid']		= $card_info_data['codeid'];
+					$pay_success_data['product_name']	= $pro_info_s['name'];
+					$pay_success_data['product_id']		= $pro_info_s['ProductId'];
+	 			      //$pay_success_data['remote_type']	= $craft_info['remoteType'];
+					$pay_success_data['craft_phone']	= $craft_info['Phone'];
+					$pay_success_data['coupons_id']		= $coupons_id;
+					$pay_success_data['code_pay_way']	= $code_pay_way;
+					
+					$this->_paySuccessDeal($pay_success_data);
+					unset($pay_success_data);
+				}
+				$data['product_name']	= $addpackage['product_name'];
+				unset($addpackage);
+				
+				$new_data = D('Comm')->lowercaseKey($data);
+				return $this->returnJsonData($exit_type,200,$new_data);
+			}else{
+				$trans_model->rollback();
+				return $this->returnJsonData($exit_type,2007,array(),'创建订单失败');
+			}
 	}
 	
 	//核销卡券，发送消息
@@ -525,5 +552,45 @@ class OrderApiController extends CommonController {
 		$pay_api_model	= D('PayApi');
 		$pay_api_model->cleanKQ($param); //核销卡券
 		$pay_api_model->sendMsg($param); //发送消息
+	}
+	
+	/**
+	 * 获取vmall支付链接
+	 * @access	public
+	 * @param	string $param['vmall_order_id'] 订单号
+	 * @param	string $param['payment_type']	web版微信100，网银200，网页淘宝300，手机淘宝400，app版微信500
+	 * @param	string $param['success_url']	支付成功跳转的链接地址
+	 * @return	string
+	 */
+	public function getPayOrderUrl($param=null) {
+		if(isset($param)){
+			$post_data	= $param;
+			$exit_type	= 'array';
+		}else{
+			$post_data	= I('request.');
+			$exit_type	= 'json';
+		}
+		$vmall_order_id	= $post_data['vmall_order_id'];
+		$payment_type	= $post_data['payment_type'];
+		$success_url	= $post_data['success_url'];
+		
+		if($payment_type == 500){
+			$data['payment_type']		= 100;
+			$data['appid']			= $this->_appid;
+			$data['appkey']			= $this->_appkey;
+			$data['partnerkeyid']		= $this->_partnerkeyid;
+			$data['partnerkey']		= $this->_partnerkey;
+		}else{
+			$data['payment_type']		= $payment_type;
+		}
+		
+		if(!in_array($data['payment_type'], $this->_payment_type)) {
+			return $this->returnJsonData($exit_type, 10005);
+		}
+		if(!($vmall_order_id && $payment_type)) {
+			return $this->returnJsonData($exit_type, 300);
+		}
+		$artisans_model = D('Api');
+		$order
 	}
 }
