@@ -173,6 +173,26 @@ class OrderApiController extends CommonController {
 	
 	//创建订单
 	public function createOrder($param=null) {
+		if(isset($param)) {
+			$post_data = $param;
+			$exit_type = 'array';
+		}else{
+			$post_data = I('request.');
+			$exit_type = 'json';
+		}
+		$user_id 	= $post_data['user_id'];
+		$craft_id	= $post_data['craft_id'];
+		$pro_id		= $post_data['pro_id'];
+		$order_name	= $post_data['name'];
+		$order_phone	= $post_data['phone'];
+		$address	= $post_data['address'];
+		$city_id	= $post_data['city_id'];
+		$source		= $post_data['source_from']; 	 //订单来源【可选值100微信，200web,300安卓，400ios】
+		$address_id	= $post_data['address_id'];	 //用户地址Id
+		$for_who	= $post_data['for_who'];	 //为谁预约【100为自己，200为朋友】
+		$wish		= $post_data['wish'];
+		$lat		= $post_data['lat'];
+		$lng		= $post_data['lng'];
 		
 	}
 	
