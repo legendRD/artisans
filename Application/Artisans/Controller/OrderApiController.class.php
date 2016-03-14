@@ -219,8 +219,43 @@ class OrderApiController extends CommonController {
 			return $this->returnJsonData($exit_type, 300);
 		}
 		if(!in_array($source, $this->_source_from)) {
-			$this->returnJsonData($exit_type,2001);
+			return $this->returnJsonData($exit_type,2001);
 		}
+		if(!in_array($for_who, $this->_for_who)) {
+			return $this->returnJsonData($exit_type, 2002);
+		}
+		if($order_phone $$ !check_phone($order_phone)) {
+			return $this->returnJsonData($exit_type, 1003);
+		}
+		if(!in_array($pay_process, $this->_pay_process)) {
+			return $this->returnJsonData($exit_type, 10004);
+		}
+		
+		$source  = $this->_source_from_id[$source];
+		$for_who = $this->_for_who_id[$for_who];
+		
+		//平台id
+		if($source == 3) {
+			$plat_from_id = 2;
+		}else{
+			$plat_from_id = $source;
+		}
+		
+		$city_info = $artisans_model->getCityInfo($city_id);
+		$city_name = $city_info['CityName'];
+		
+		if($craft_id) {
+			$craft_info = M('crt_craftsmaninfo')->where(" CraftsmanId=%d", $craft_id)->find();		//XXX信息
+		}
+		$register_info = $artisans_model->getUserInfo($user_id);						//终端用户信息
+		/*if(empty($register_info['uid'])) {
+			return $this->returnJsonData($exit_type,10003);
+		}*/
+		
+		$data['Status']			= 0;
+		$data['CraftsmanId']		= $craft_id;
+		$data['CraftsmanOpenid']	= $craft_info['Openid'];
+		
 	}
 	
 	//核销卡券，发送消息
