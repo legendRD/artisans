@@ -939,11 +939,48 @@ class OrderApiController extends CommonController {
 	}
 	
 	private function _cancleOrderBy($param) {
-		
+		$order_info	= $this->_cancleOrderComm($param);
+		$data['order_id']	= $order_info['OrderId'];
+		$data['uid']		= $order_info['UserId'];
+		unset($order_info);
+		return $data;
 	}
 	
 	private function _cancleOrder($param) {
-		
+		$order_info	= $this->_cancleOrderComm($param);
+		if($order_info) {
+			$pay_api_model	= D('PayApi');
+			$product_name	= M('ord_order_item')->where("OrderId=%d",$order_info['OrderId'])->getField('ProductName');
+			$craft_phone	= M('crt_craftsmaninfo')->where(array('CraftsmanId'=>$order_info['CraftsmanId']))->getField('Phone');
+			
+			if($order_info['PayWay'] == 1) {
+				$user_content	='【服务取消】您已经取消您预约的XXXXX的【'.$product_name.'】服务.同时感谢您对XXXXX的支持。';
+			}else{
+				$user_content	='【服务取消】您已经取消您预约的XXXXX的【'.$product_name.'】服务，服务相应的费用我们会在2个工作日内退款给您，部分银行到账期为3-15天，请您注意查收。同时感谢您对XXXXX的支持。';
+			}
+			$qcs_content	='【服务取消】用户'.$order_info['Name'].'，电话'.$order_info['Phone'].'，已经取消预约你的【'.$product_name.'】服务，原服务时间是'.$order_info['ReservationTime'].'。';
+			
+			$pay_api_model->_sendWeixinMsg($order_info['UserOpenid'],$user_content);
+			$pay_api_model->_sendWeixinMsg($order_info['CraftsmanOpenid'],$qcs_content);
+			$pay_api_model->_sendShortMessage($order_info['Phone'],$user_content);
+			$pay_api_model->_sendShortMessage($craft_phone,$qcs_content);
+			
+			/*$private_phone = array(
+					'13000000000',
+					'15000000000',
+					'16000000000',
+					'17000000000',
+					'18000000000',
+					$craft_phone
+			);
+			foreach($private_phone as $value){
+				$pay_api_model->_sendShortMessage($value,$qcs_content);
+			}*/
+			
+			return $order_info;
+		}else{
+			return false;
+		}
 	}
 	
 	private function _cancleOrderComm($param) {
