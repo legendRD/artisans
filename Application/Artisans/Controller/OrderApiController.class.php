@@ -591,6 +591,50 @@ class OrderApiController extends CommonController {
 			return $this->returnJsonData($exit_type, 300);
 		}
 		$artisans_model = D('Api');
-		$order
+		$order_info     = M('ord_orderinfo')->where(array('VmallOrderId'=>$vmall_order_id))->find();
+		$order_id	= $order_info['OrderId'];
+		if(!$order_id) {
+			return $this->returnJsonData($exit_type, 1007);		//订单已失效
+		}
+		$data['order_id']   = $vmall_order_id;
+		$data['uid']	    = $order_id;
+		$data['return_url'] = $success_url	//支付成功跳转地址 
+		$data['ip']	    = get_ip();
+		
+		$payData            = send_curl($this->_orderPay_url, $data);
+		$parsePay           = json_decode($payData, true);
+		unset($data);
+		
+		$hash = array();
+		if($parsePay['data']) {
+			if(is_array($parsePay['data'])) {
+				$requestUrl  = joinUrl($parsePay['data']['url'], $parsePay['data']['data']);
+				$hash['url'] = $requestUrl;
+				if($data['payment_type'] == 100) {
+					$getShortUrl = send_curl($this->_changeUrl, array('url'=>$requestUrl));
+					$getShort    = json_decode($getShortUrl, true);
+					$hash['url'] = $getShort['data'] ? $getShort['data'] : $requestUrl;
+				}
+			}else{
+				return $this->returnJsonData($exit_type, 2007, array(), $parsePay['data']);
+			}
+		}
+		return $this->returnJsonData($exit_type, 200, $hash);
+	}
+	
+	//更新订单状态【支付成功】,发消息
+	public function update_order() {
+		$post_data = I('request.');
+		$out_order_no	= $post_data['out_trade_no']; //订单号
+		$log_url	= $this->_update_order_status.'/product_'.date('Ymd').'.log';
+		wlog($log_url, "----------start----------");
+		wlog($log_url, "接收参数：".serialize($post_data));
+		if($out_order_no) {
+			$where = array(
+				'VmallOrderId'=>$out_order_no,
+				'status'=>0
+			);
+			$rows  = M('ord_orderinfo')->where($where)->find();
+		}
 	}
 }
