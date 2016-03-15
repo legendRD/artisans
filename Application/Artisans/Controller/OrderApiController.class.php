@@ -388,7 +388,7 @@ class OrderApiController extends CommonController {
 			$data['IsDelete']    = 0;
 			$data['Price']       = $price;
 			
-			//微信正常支付需要判断产能是否存在
+			//微信正常支付需要判断XX是否存在
 			if($pay_process == 1) {
 				$yuyuetime = strtotime($reservation_time);
 				if($yuyuetime<time() || $yuyue_time-time()<10800) {
@@ -408,7 +408,7 @@ class OrderApiController extends CommonController {
 				$out_trade_no = $data['VmallOrderId'] = create_order_id();
 			}
 			
-			//判断差能是否被占用
+			//判断XX是否被占用
 			if($pay_process == 1) {
 				$time_num = M('crt_use')->where()->count();
 				if($time_num > 0) {
