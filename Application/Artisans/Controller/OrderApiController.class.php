@@ -14,7 +14,7 @@ class OrderApiController extends CommonController {
     private $_getTrade_url	= "http://localhost/order/addor"; 	      //生成订单号地址
     private $_orderPay_url	= "http://localhost/Paycenter/CreatePayInfo"; //支付接口
     private $_getStatus		= "http://localhost/order/list"; 	      //获取订单状态地址
-    private $_changeUrl 	= "http://localhost/Qrcode/shorturl"; 	      //长连接变为短连接
+    private $_changeUrl         = "http://localhost/Qrcode/shorturl"; 	      //长连接变为短连接
     
     //app微信支付
     private $_appid		= '';
