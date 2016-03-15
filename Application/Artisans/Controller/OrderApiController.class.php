@@ -1025,7 +1025,32 @@ class OrderApiController extends CommonController {
 	 * @return boolean|multitype:unknown Ambigous <>
 	 */
 	public function getOrderShopInfo($order_id) {
-		
+		if(empty($order_id)) {
+			return false;
+		}
+		$order_shop_info	= M()->table('ord_orderinfo as oo')
+					     ->join(' left join ord_order_item as ooi on oo.OrderId=ooi.OrderId ')
+					     ->join('left join prd_productinfo as pp on pp.ProductId=ooi.ProductId')
+					     ->where(array('oo.OrderId'=>$order_id))
+					     ->field('count(1) num,ooi.PackageId package_id,ooi.PackageName package_name,group_concat(ooi.ProductId) as pro_id,group_concat(ooi.ProductName)as pro_name,LogoImgUrl,LogoImgCdnUrl')
+					     ->group('oo.OrderId')
+					     ->find();
+		$tmp	= array();
+		if($order_shop_info) {
+			if($order_shop_info['package_id']) {
+				$tmp['shop_name']	= $order_shop_info['package_name'];
+				$tmp['shop_id']		= $order_shop_info['package_id'];
+			}elseif($order_shop_info['num']>1) {
+				$tmp['shop_name']	= $order_shop_info['pro_name'];
+				$tmp['shop_id']		= $order_shop_info['pro_id'];
+				$tmp['pro_img']		= $this->getImgUrl($order_shop_info['LogoImgCdnUrl'], $order_shop_info['LogoImgUrl']);
+			}else{
+				$tmp['shop_name']	= $order_shop_info['pro_name'];
+				$tmp['shop_id']		= $order_shop_info['pro_id'];
+				$tmp['pro_img']		= $this->getImgUrl($order_shop_info['LogoImgCdnUrl'], $order_shop_info['LogoImgUrl']);
+			}
+		}
+		return $tmp;
 	}
 	
 	/**
