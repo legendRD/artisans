@@ -984,7 +984,39 @@ class OrderApiController extends CommonController {
 	}
 	
 	private function _cancleOrderComm($param) {
+		$order_id	= $param['order_id'];
+		$uid		= $param['uid'];
+		if(!($order_id && $uid)) {
+			return false;
+		}
 		
+		$order_info	= M('ord_orderinfo')->where("OrderId=%d and UserId=%d ",$order_id,$uid)->find();
+		//线下支付或者支付成功的方可取消订单
+		if(!(($order_info['Status'] == 0 && $order_info['PayWay'] == 1) || $order_info['Status']>2)) {
+			return false;
+		}
+		$create_time= date('Y-m-d H:i:s');
+		$data	= array(
+				'Status'=>2,
+				'UpdateTime'=>$create_time
+		);
+		
+		$status	= M('ord_orderinfo')->where("OrderId=%d",$order_id)->save($data);
+		if($status) {
+			
+			$pay_api_model	= D('PayApi');
+			$order_status_info['order_id']	  = $order_id;
+			$order_status_info['state']	  = 2;
+			$order_status_info['create_time'] = $create_time;
+			$pay_api_model->addOrderState($order_status_info);	//订单状态
+			unset($order_status_info);
+			$pay_api_model->releaseCapacity($order_info['CapacityId']); //释放用户XX
+			$order_info['Status']		  = 2; //发送消息
+			$order_info['UpdateTime']	  = $create_time;
+			return $order_info;
+		}else{
+			return false;
+		}
 	}
 	
 	/**
