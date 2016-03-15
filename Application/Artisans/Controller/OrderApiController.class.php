@@ -20,7 +20,7 @@ class OrderApiController extends CommonController {
     private $_appid		= '';
     private $_appkey		= '';
     private $_partnerkeyid	= '';
-    private $_partnerkey	= '';
+    private $_partnerkey        = '';
     
     //日志
     private $_update_order_status	= "/share/weixinLog/artisans/pay_order/update_order";	//订单日志
