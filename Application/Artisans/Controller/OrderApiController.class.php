@@ -31,8 +31,8 @@ class OrderApiController extends CommonController {
     private $_pay_way		= array(1,2,3,4);
     private $_pay_process	= array(1,2,3,4);     //支付流程：1正常支付，2客服引导，3客服专家在线，4.距离大于40公里支付
     private $_update_type	= array(100,200,300); //100取消订单
-    private $_craft_step	= array(1,2,3,4,5,6); //XXX服务流程
-    private $_scrypt_pwd	= '';
+    private $_craft_step        = array(1,2,3,4,5,6); //XXX服务流程
+    private $_scrypt_pwd        = '';
     
     //域名
     private $string  ='';
