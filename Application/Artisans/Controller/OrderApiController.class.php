@@ -427,7 +427,7 @@ class OrderApiController extends CommonController {
 			$trans_status = true;
 			
 			if($pay_process == 1) {
-				$trans_status = $artisans_model->reduceCapacity($capacity_id);	//减产能
+				$trans_status = $artisans_model->reduceCapacity($capacity_id);	//减XX
 				if($trans_status) {
 					$trans_status = M('crt_use')->add(array('CapacityId'=>$capacity_id, 'UserId'=>$register_info['UserId'], 'CreaterTime'=>$create_time));
 				}
