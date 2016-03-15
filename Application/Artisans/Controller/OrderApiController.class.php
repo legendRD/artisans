@@ -635,6 +635,269 @@ class OrderApiController extends CommonController {
 				'status'=>0
 			);
 			$rows  = M('ord_orderinfo')->where($where)->find();
+			wlog($log_url, "order_info:".serialize($rows));
+			if($rows && is_array($rows)) {
+				$order_id	= $rows['OrderId'];
+				$state		= 3;
+				$capacity_id	= $rows['CapacityId'];
+				if($order_id) {
+					$log_txt_success	= '';
+					$log_txt_error		= '';
+					
+					//更新订单状态
+					$save	= array('Status'=>$state,'UpdateTime'=>date('Y-m-d H:i:s'));
+					$result	= M('ord_orderinfo')->where(" OrderId=".$order_id)->save($save);
+					if($result) {
+						$log_txt_success .= 'ord_orderinfo=>'.$order_id.',';
+					}else{
+						$log_txt_error   .= 'ord_orderinfo=>'.$order_id.',';
+					}
+					
+					//插入订单状态日志
+					$add	= array(
+						'OrderId'     => $order_id,
+						'State'	      => $state,
+						'CreaterBy'   => 1,
+						'CreaterTime' => date('Y-m-d H:i:s'),
+					);
+					
+					$result	= M('ord_state')->add($add);
+					if($result) {
+						$log_txt_success .= 'ord_state=>'.$order_id.',';
+					}else{
+						$log_txt_error   .= 'ord_state=>'.$order_id.',';
+					}
+					
+					//更新XX表日期
+					$result	=  M("crt_capacity")->where("CapacityId=".$capacity_id)->save(array('RecoveryTime'=>date('Y-m-d H:i:s')));
+					if($result) {
+						$log_txt_success .= 'crt_capacity=>'.$capacity_id.',';
+					}else{
+						$log_txt_error   .= 'crt_capacity=>'.$capacity_id.',';
+					}
+					
+					//给用户发送消息
+					if($log_txt_success) {
+						wlog($log_url, $log_txt_success);
+					}
+					if($log_txt_error) {
+						wlog($log_url, $log_txt_error);
+					}
+				}
+			}
+		}
+		wlog($log_url, "----------end----------");
+	}
+	
+	//订单常用操作: 取消订单，服务，点评
+	public function updateOrder($param=null) {
+		if(isset($param)) {
+			$post_data	= $param;
+			$exit_type	= 'array';
+		}else{
+			$post_data	= I('request.');
+			$exit_type	= 'json';
+		}
+		
+		$update_type	= $post_data['update_type'];
+		$order_id	= $post_data['order_id'];
+		
+		if(!$order_id) {
+			return $this->returnJsonData($exit_type,300);
+		}
+		if(!in_array($update_type, $this->_update_type)) {
+			return $this->returnJsonData($exit_type,10005);
+		}
+		switch($update_type) {
+			case 100: //取消订单
+				$data	= $this->_cancleOrder($post_data);
+				break;
+			case 200: //点评
+				$data	= $this->_createComments($post_data);
+				break;
+			case 300: //XX撤单
+				$data	= $this->_cancleOrderBy($post_data);
+				break;
+		}
+		if($data) {
+			return $this->returnJsonData($exit_type,200,$data);
+		}else{
+			return $this->returnJsonData($exit_type,200,array());
 		}
 	}
+	
+	// 0 未支付，100支付失败，200取消订单，300已支付，400已服务，500已点评，600申请退款
+	public function getOrderStatus($status) {
+		switch($status){
+			case 1:
+				$status	= 100;
+				break;
+			case 2:
+				$status	= 200;
+				break;
+			case 3:
+				$status	= 300;
+				break;
+			case 4:
+				$status	= 400;
+				break;
+			case 7:
+				$status	= 500;
+				break;
+			case 8:
+				$status	= 600;
+				break;
+			default:
+				$status	= 0;
+		}
+		return $status;
+	}
+	
+	/**
+	 * 获取图片地址
+	 * @access public
+	 * @param unknown $cdn_url
+	 * @param unknown $self_url
+	 * @return unknown|string
+	 */
+	public function getImgUrl($cdn_url,$self_url) {
+		if($cdn_url) {
+			return $cdn_url;
+		}else{
+			if($self_url) {
+				return I('server.HTTP_HOST').$self_url;
+			}else{
+				return '';
+			}
+		}
+	}
+	
+	//获取客服导购商品价格
+	public function getDaogou($param=null) {
+		if(isset($param)){
+			$post_data	= $param;
+			$exit_type	= 'array';
+		}else{
+			$post_data	= I('request.');
+			$exit_type	= 'json';
+		}
+		
+		$shop_id	= $post_data['p_type'];
+		
+		if(!$shop_id) {
+			return $this->returnJsonData($exit_type,300);
+		}
+		
+		$data  = M("prd_shopinfo")->where(" shop_id=%d and shop_status=1", $shop_id)->find();
+		if(!$data) {
+			$data = array();
+		}
+		return $this->returnJsonData($exit_type,200,$data);
+	}
+	
+	//XX撤单
+	public function cancleOrderBy() {
+		
+	}
+	
+	//返回数据
+	public function returnJsonData($exit_type,$code,$data=array(),$msg='') {
+		switch($code){
+			case 200:
+				$hash['code']	= 200;
+				$hash['message']= 'success';
+				$hash['data']	= $data;
+				break;
+			case 300:
+				$hash['code']	= 300;
+				$hash['message']= '缺少参数';
+				break;
+			case 1000:
+				$hash['code']	= 1000;
+				$hash['message']= '订单已锁定，请重新下单';
+				break;
+			case 1001:
+				$hash['code']	= 1001;
+				$hash['message']= '订单已锁定，请重新下单';
+				break;
+			case 1003:
+				$hash['code']	= 1003;
+				$hash['message']= '手机号错误';
+				break;
+			case 1006:
+				$hash['code']	= 1006;
+				$hash['message']= '已评论';
+				break;
+			case 1007:
+				$hash['code']	= 1007;
+				$hash['message']= '订单已失效';
+				break;
+			case 2001:
+				$hash['code']	= 2001;
+				$hash['message']= '订单来源有误';
+				break;
+			case 2002:
+				$hash['code']	= 2002;
+				$hash['message']= '为谁预约来源有误';
+				break;
+			case 2003:
+				$hash['code']	= 2003;
+				$hash['message']= '服务产品信息不存在';
+				break;
+			case 2004:
+				$hash['code']	= 2004;
+				$hash['message']= '订单支付类型有误';
+				break;
+			case 2005:
+				$hash['code']	= 2005;
+				$hash['message']= '订单号不存在';
+				break;
+			case 2006:
+				$hash['code']	= 2006;
+				$hash['message']= '商品不存在';
+				break;
+			case 2007:
+				$hash['code']	= 2007;
+				$hash['message']= $msg;
+				break;
+			case 10000:
+				$hash['code']	= 10000;
+				$hash['message']= '没有访问权限';
+				break;
+			case 10003:
+				$hash['code']	= 10003;
+				$hash['message']= '用户不存在';
+				break;
+			case 10004:
+				$hash['code']	= 10004;
+				$hash['message']= '支付流程不存在';
+				break;
+			case 10005:
+				$hash['code']	= 10005;
+				$hash['message']= '传参有误';
+				break;
+			case 10006:
+				$hash['code']	= 10006;
+				$hash['message']= '客服导购产品不存在';
+				break;
+			case 10007:
+				$hash['code']	= 10007;
+				$hash['message']= '订单号生成失败';
+				break;
+			default:
+				$hash['code']	= -100;
+				$hash['message']= '信息有误';
+				break;
+			if($exit_type == 'json') {
+				if(I('get.parse')=='echo_info') {
+					pp($hash);
+				}
+				echo json_encode($hash);
+				exit();
+			}else{
+				return $hash;
+			}
+	}
+	
+	
 }
