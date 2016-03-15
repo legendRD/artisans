@@ -982,4 +982,40 @@ class OrderApiController extends CommonController {
 	public function updateArtisanStatus() {
 		
 	}
+	
+	/**
+	 * 第三方生成订单【XX】
+	 * @param	int		user_id	 用户id
+	 * @param	int		craft_id XXXid
+	 * @param	int		pro_id	 产品id
+	 * @param	string		name	 用户姓名
+	 * @param	string		phone	 用户手机号
+	 * @param	string		address	 用户地址
+	 * @param	int		city_id	 城市Id
+	 * @param	float		lat	 纬度
+	 * @param	float		lng	 经度
+	 * @param	date		order_date 	预约日期
+	 * @param	int		order_time_id   时间Id
+	 * @param	string		openid 		用户openid
+	 * @param	int		price		支付价格【单位：分】
+	 * @param	string		recycle_txt     备注
+	 * @return      string
+	 */
+	public function newBillBy() {
+		
+	}
+	
+	/** 
+	 * 创建订单
+	 * @param	int $param['user_id]  用户id
+	 * @param	int $param['for_who'] 为谁预约 【100为自己，200为朋友】
+	 * @param	int $param['city_id'] 城市id
+	 * @param	int $param['source_from'] 订单来源
+	 * @param	int $param['pay_process'] 支付流程
+	 * @param	int $param['pay_way']     支付方式
+	 * @return string
+	 */
+	public function createOrder2($param=null) {
+		
+	}
 }
