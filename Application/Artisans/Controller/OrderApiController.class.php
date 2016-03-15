@@ -7,7 +7,7 @@ class OrderApiController extends CommonController {
     private $_ucenter_from	= array('weixin','web','android','ios'); //第三方用户注册来源，对应上面订单来源
     private $_source_from_id    = array(100=>0,200=>1,300=>2,400=>3,500=>4); //订单来源对应的码值
     private $_for_who		= array(100,200);	//预约【100为自己，200为朋友】
-    private $_for_who_id	= array(100=>0,200=>1); 
+    private $_for_who_id        = array(100=>0,200=>1); 
     private $_payment_type	= array(100,200,300,400); //微信100，网银200，网页淘宝300，手机淘宝400 
     
     //订单接口
