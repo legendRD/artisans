@@ -899,5 +899,87 @@ class OrderApiController extends CommonController {
 			}
 	}
 	
+	private function _cancleOrderBy($param) {
+		
+	}
 	
+	private function _cancleOrder($param) {
+		
+	}
+	
+	private function _cancleOrderComm($param) {
+		
+	}
+	
+	/**
+	 * 支付获取商品名
+	 * @param int $order_id
+	 * @return boolean|multitype:unknown Ambigous <>
+	 */
+	public function getOrderShopInfo($order_id) {
+		
+	}
+	
+	/**
+	 * 订单套餐明细
+	 * @access public
+	 * @param int $order_id
+	 * @param int $package_id
+	 * @return mixed
+	 */
+	public function addPackage($var) {
+		
+	}
+	
+	//更新订单关键步骤
+	public function updateOrderStep($param=null) {
+		
+	}
+	
+	//提交点评
+	public function createComments($param=null) {
+		
+	}
+	
+	/**
+	 * 更新订单支付方式
+	 * @param  string $param['vmall_order_id'] 订单号
+	 * @param  int	  $param['pay_way'] 	   订单支付方式
+	 * @return string
+	 */
+	public function updatePayWay($param=null) {
+		
+	}
+	
+	/**
+	 * 获取支付价格
+	 * @param  string $param['pro_id']	产品id
+	 * @param  string $param['lat']		纬度
+	 * @param  string $param['lng']		经度
+	 * @param  string $param['craft_id']	XXXid
+	 * @param  string $param['city_id']	城市id
+	 * @param  string $param['source_from'] 来源
+	 * @param  string $param['user_id']	用户id
+	 * @param  string $param['pay_process']	支付流程
+	 * @param  string $param['pay_way']	支付方式
+	 * @return string
+	 */
+	public function getProPrice($param=null) {
+		
+	}
+	
+	/**
+	 * 生成订单推送消息
+	 * @access	public
+	 * @param	string $param['order_id'] 订单id
+	 * @return	string
+	 */
+	public function sendAppMsg($param=null) {
+		
+	}
+	
+	//更新订单状态接口
+	public function updateArtisanStatus() {
+		
+	}
 }
