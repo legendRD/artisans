@@ -797,7 +797,46 @@ class OrderApiController extends CommonController {
 	
 	//XX撤单
 	public function cancleOrderBy() {
+		$post_string	= I('request.pos_str');
+		$exit_type	= 'json';
+		$key		= $this->_scrypt_pwd;
+		$model		= new \Artisans\Org\Scrypt($key);
+		$de_string	= $model->decrypt_base64($post_string);
+		parse_str($de_string, $post_data);
 		
+		if(!($post_data['order_id'] && $post_data['uid'])) {
+			return $this->returnJsonData($exit_type,300);
+		}
+		$order_info 	= $this->_cancleOrderComm($post_data);
+		$data['order_id']	= $order_info['OrderId'];
+		$data['uid']		= $order_info['UserId'];
+		if($data) {
+			$order_id = $post_data['order_id'];
+			
+			$pro = M('ord_order_item')->where(array('OrderId'=>$order_id))->field('ProductId')->select();
+			if(!$pro) {
+				$this->returnJsonData($exit_type, 501);
+			}
+			$pro_id = $pro[0]['ProductId'];
+                        if(!$pro_id) {
+                            $this->returnJsonData($exit_type, 502);
+                        }
+                        $res = M('crt_capacity as c')
+                                ->join('inner join ord_orderinfo as o on c.CapacityId = o.CapacityId')
+                                ->where(array('OrderId'=>$order_id))
+                                ->field('Capacity, TimeId')
+                                ->select();
+                        $order_date    = $res[0]['Capacity'];
+                        $order_time_id = $res[0]['TimeId'];
+                        
+                        $rsu = D('Api')->newBillCapacity($pro_id, $order_date, $order_time_id, $type='cancel');
+                        if(!$rsu) {
+                        	return $this->returnJsonData($exit_type, 503);
+                        }
+                        return $this->returnJsonData($exit_type, 200, $data);
+		}else{
+			return $this->returnJsonData($exit_type,200,array());
+		}
 	}
 	
 	//返回数据
