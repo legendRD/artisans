@@ -1061,17 +1061,190 @@ class OrderApiController extends CommonController {
 	 * @return mixed
 	 */
 	public function addPackage($var) {
-		
+		$order_id	= $var['order_id'];
+		$package_id	= $var['package_id'];
+		$product_id	= $var['product_id'];
+		$product_name	= $var['product_name'];
+		$price		= $var['product_price'];
+		if(!($order_id && is_numeric($order_id))) {
+			return false;
+		}
+		$data = array();
+		if($package_id) {
+			$package_info = M()->table('prd_package pinfo')
+					   ->join('prd_packageitme pdetail on pinfo.PackageId = pdetail.PackageId')
+					   ->join('prd_productinfo pp on pdetail.ProductId = pp.ProductId')
+					   ->where("pdetail.PackageId=%d",$package_id)
+					   ->field('pinfo.Name as name,pinfo.Price as price,pdetail.ProductId as product_id,pdetail.Price as product_price,pp.ProductName as product_name')
+					   ->select();
+			foreach((array)$package_info as $value) {
+				$tmp['OrderId']     = $order_id;
+				$tmp['PackageId']   = $package_id;
+				$tmp['PackageName'] = $value['name'];
+				$tmp['ProductId']   = $value['product_id'];
+				$tmp['ProductName'] = $value['product_name'];
+				$tmp['Price']	    = $value['product_price'];
+				$data[] = $tmp;
+			}
+			if($data) {
+				$id = M('ord_order_item')->addAll($data);
+			}
+		}else{
+			$data['OrderId'] 	= $order_id;
+			$data['ProductId']	= $product_id;
+			$data['ProductName']	= $product_name;
+			$data['Price']		= $price;
+			$id = M('ord_order_item')->add($data);
+		}
+		if($id) {
+			return $id;
+		}else{
+			//订单套餐日志表
+			return false;
+		}
 	}
 	
 	//更新订单关键步骤
 	public function updateOrderStep($param=null) {
+		if(isset($param)){
+			$post_data	= $param;
+			$exit_type	= 'array';
+		}else{
+			$post_data	= I('request.');
+			$exit_type	= 'json';
+		}
 		
+		$data['OrderId'] = $order_id = $post_data['order_id'];
+		$data['StepId']  = $step_id  = $post_data['step_id'];
+		$status = $post_data['step_status'];	//100:'yes'  200:'no'
+		i(!($order_id && $step_id && $status)) {
+			return $this->returnJsonData($exit_type, 300);
+		}
+		$data['State'] = $status == 100? 1:0;
+		$data['CreaterTime']  = date('Y-m-d H:i:s');
+		$id = M('cut_stepstate')->add($data);
+		if($id) {
+			$product_id = M('ord_order_item')->where('OrderId=%d', $order_id)->getField('ProductId');
+			$pro_step   = M('prd_step')->where('ProductId'=>$product_id)->field('StepId')->select();
+			$step_arr   = array();
+			foreach($pro_step as $value) {
+				if($step_id <> $value['StepId']) {
+					$step_arr[] = $value['StepId'];
+				}
+			}
+			$where = array(
+				'OrderId' => $order_id,
+				'StepId'  => array('in', $step_arr)
+			);
+			$step_info = M('cut_stepstate')->where($where)->select();
+			unset($where);
+			$hash['status'] = 'no';
+			//用户关键步骤走完
+			if(count($step_arr) <= count($step_info)) {
+				$craft_step_status	= false; //XXX服务流程走完
+				$where_s	= array(
+					'OrderId' => $order_id,
+					'ProcessId'=>array('in', $this->_craft_step)
+				);
+				
+				$count	= M('ord_procedure_log')->where($where_s)->count();
+				unset($where_s);
+				if($count>=($this->_craft_step)) {
+					$craft_step_status = true;
+				}
+				//更新订单为已服务
+				if($craft_step_status) {
+					$order_data['UpdateTime']		= $data['CreaterTime'];
+					$order_data['Status']			= 4;
+					
+					$id	= M('ord_orderinfo')->where("OrderId=%d",$order_id)->save($order_data);
+					if($id) {
+						$order_status_info['order_id']	= $order_id;
+						$order_status_info['state']		= 4;
+						$order_status_info['create_time']= $data['CreaterTime'];
+						$status	= D('PayApi')->addOrderState($order_status_info);	//订单状态
+						unset($order_status_info);
+					}
+					$hash['status'] = 'yes';
+				}
+			} 
+			$hash['create_time'] = $data['CreaterTime'];
+			unset($data);
+			$hash['step_info'] = $step_info;
+			return $this->returnJsonData($exit_type, 200, $hash);
+		}else{
+			return $this->returnJsonData($exit_type, 200, array());
+		}
 	}
 	
 	//提交点评
 	public function createComments($param=null) {
+		if(isset($param)){
+			$post_data	= $param;
+			$exit_type	= 'array';
+		}else{
+			$post_data	= I('request.');
+			$exit_type	= 'json';
+		}
 		
+		$order_id	= trim($post_data['order_id']);
+		$user_id	= trim($post_data['user_id']);
+		$comment	= $post_data['comment'];
+		$stars		= trim($post_data['stars']);
+		$source		= trim($post_data['source_from']);
+		if(!($order_id && $user_id && $stars && $source)) {
+			return $this->returnJsonData($exit_type,300);
+		}
+		if(!in_array($source, $this->_source_from)) {
+			return $this->returnJsonData($exit_type,2001);
+		}
+		$source	= $this->_source_from_id[$source];
+		
+		$order_info = M('ord_orderinfo')->find($order_id);
+		if(empty($order_info)) {
+			return $this->returnJsonData($exit_type, 2005);
+		}
+		$api_model = D('Api');
+		$user_info = $api_model->getUserInfo($user_id);
+		if($order_info['Status'] == 4) {
+			$count	= M('prd_evaluation')->where(array('UserId'=>$user_id,'OrderId'=>$order_id))
+						     ->count();
+			if($count > 0) {
+				return $this->returnJsonData($exit_type, 1006);
+			}else{
+				$data['OrderId']	= $order_id;
+				$data['UserId']		= $user_id;
+				$data['NickName']	= $user_info['nickname'];
+				$data['HeadImgUrl']	= $user_info['avatar'];
+				$data['CraftsmanId']	= $order_info['CraftsmanId'];
+				$data['Comments']	= $comment;
+				$data['StarNums']	= $stars;
+				$data['CreaterTime']	= date('Y-m-d H:i:s');
+				$data['Source']		= $source;
+				
+				$id	= M('prd_evaluation')->add($data);
+				//更新订单状态
+				if($id) {
+					$id = M('ord_orderinfo')->where(array('OrderId'=>$order_id))
+								->save(array('Status'=>7,'UpdateTime'=>date('Y-m-d H:i:s')));
+					if($id) {
+						$order_data['order_id']		= $order_id;
+						$order_data['state']		= 7;
+						$order_data['create_time']	= date('Y-m-d H:i:s');
+						
+						//订单状态
+						$id = D('PayApi')->addOrderState($order_data);
+						if($id) {
+							return $this->returnJsonData($exit_type, 200);
+						}
+					}
+				}
+			}
+		}elseif($order_info['Status'] == 7) {
+			return $this->returnJsonData($exit_type, 1006);
+		}else{
+			return $this->returnJsonData($exit_type, 2007, array(), '订单不能点评');
+		}
 	}
 	
 	/**
