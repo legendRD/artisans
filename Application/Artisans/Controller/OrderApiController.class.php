@@ -1411,11 +1411,6 @@ class OrderApiController extends CommonController {
 		return $this->returnJsonData($exit_type,200);
 	}
 	
-	//更新订单状态接口
-	public function updateArtisanStatus() {
-		
-	}
-	
 	/**
 	 * 第三方生成订单【XX】
 	 * @param	int		user_id	 用户id
@@ -1529,7 +1524,7 @@ class OrderApiController extends CommonController {
 		}
 		$data['ProductRewardId'] = $pro_reward_id ? $pro_reward_id : 0;
 		
-		//$price = $price/100;		//测试时的订单价格
+	      //$price 				 = $price/100;		//测试时的订单价格
 	      //$product_info_data['CityId']	 = $city_id;
 	      /*$product_info_data['PlatformId'] = $plat_from_id;
 		$product_info_data['ProductId']	 = $pro_id;
@@ -1573,7 +1568,120 @@ class OrderApiController extends CommonController {
 		$trans_model->startTrans();
 		$trans_status	= true;
 		
+		if($pay_process == 1) {
+			$trans_status	= $artisans_model->reduceCapacity($capacity_id); //减XX
+			if($trans_status) {
+				$trans_status	= M('crt_use')->add(array('CapacityId'=>$capacity_id,'UserId'=>$register_info['UserId'],'CreaterTime'=>$create_time));
+			}
+			$type = 'book';
+			$id   = D('Api')->newBillCapacity($pro_id, $order_date, $order_time_id, $type);
+			if($id == false) {
+				return $this->returnJsonData($exit_type,2007,array(),"更新当前产能失败.$pro_id.<br>.$order_date.<br>.$order_time_id.<br>");
+			}
+			$data['sunshine_id']= $post_data['no'];
+			if($trans_status) {
+				$trans_status	 = M('ord_orderinfo')->add($data);	//订单基本信息
+				$data['OrderId'] = $trans_status;
+			}
+			if($trans_status) {
+				$order_id				= $trans_status;
+				$order_status_info['order_id']		= $order_id;
+				$order_status_info['state']		= $data['Status'];
+				$order_status_info['create_time']	= $create_time;
+				
+				$trans_status				= D('PayApi')->addOrderState($order_status_info);	//订单状态
+				unset($order_status_info);
+			}
+			
+			if($trans_status) {
+				$addpackage['product_id']	= $pro_info_s['ProductId'];
+				$addpackage['product_name']	= $pro_info_s['ProductName'];
+				$addpackage['product_price']	= $pro_info_s['Price'];
+				$addpackage['order_id']		= $order_id;
+				$addpackage['package_id']	= '';
+				$trans_status			= $this->addPackage($addpackage);	//订单套餐明细
+				unset($addPackage);
+			}
+			
+			$new_data = array();
+			if($trans_status) {
+				$trans_model->commit();
+				$new_data['order_id']		= $data['OrderId'];
+				$new_data['vmall_order_id']	= $data['VmallOrderId'];
+				return $this->returnJsonData($exit_type,200,$new_data);
+			}else{
+				$trans_model->rollback();
+				if($post_data['no']) {
+					$order_info  = M('ord_orderinfo')->where(" sunshine_id='%s'", $post_data['no'])->find();
+				}
+				if($post_info['OrderId'] && $order_info['VmallOrderId']) {
+					$new_data['order_id']		= $order_info['OrderId'];
+					$new_data['vmall_order_id']	= $order_info['VmallOrderId'];
+					return $this->returnJsonData($exit_type, 200, $new_data);
+				}else{
+					return $this->returnJsonData($exit_type,2007,array(),'创建订单失败');
+				}
+			}
+		}
+	}
+	
+	//更新订单状态接口
+	public function updateArtisanStatus() {
+		$log_url = '/opt/www_log/'.C('TP_PROJECT_APP').'/order_log/update_order_status'.date('Ymd').'.log';
+		wlog($log_url, "==========start==========");
 		
+		//解析参数
+		$request_data = I('get.');
+		wlog($log_url, $request_data);
+		$post_string = $request_data['pos_str'];
+		$model = new \Artisans\Org\Scrypt($this->_scrypt_pwd);
+		$de_string = $model->decrypt_base64($post_string);
+		parse_str($de_string, $post_data);
+		wlog($log_url, $post_data);
+		
+		$order_id	= $post_data['order_id']; 
+		$yz_code	= $post_data['yz_code'];
+		if($yz_code == 'hello_code') {
+			$where	= array(
+					'OrderId'=>$order_id,
+					'Status'=>0
+			);
+			
+			$order_info	= M('ord_orderinfo')->where($where)->find();
+			wlog($log_url,$order_info);
+			
+			$order_id	= $order_info['OrderId'];
+			if($order_id) {
+				$update_time	= date('Y-m-d H:i:s');
+				$pay_api_model	= D('PayApi');
+				
+				//更新订单状态
+				$order_status_data['Status']	= $order_info['Status'] 	= 3;
+				$order_status_data['UpdateTime']= $order_info['UpdateTime'] 	= $update_time;
+				$order_status_data['PayTime']	= $order_info['PayTime']	= $update_time;
+				$id				= M("ord_orderinfo")->where("OrderId=".$order_id)->save($order_status_data);
+				unset($order_status_data);
+				
+				//插入订单状态日志
+				$order_status_info['order_id']		= $order_id;
+				$order_status_info['state']		= 3;
+				$order_status_info['create_time']	= $update_time;
+				$trans_status				= $pay_api_model->addOrderState($order_status_info);
+				unset($order_status_info);
+				
+				//更新产能表日期
+				M('crt_capacity')->where(array('CapacityId'=>$order_info['CapacityId']))->save(array('UseTime'=>$update_time));
+				
+				//发送消息
+				$pro_info			= M('ord_order_item')->where("OrderId=%d",$order_id)->field('ProductName,ProductId')->find();
+				$order_info['product_name']	= $pro_info['ProductName'];
+				$order_info['product_id']	= $pro_info['ProductId'];
+				$order_info['craft_phone']	= M('crt_craftsmaninfo')->where(array('CraftsmanId'=>$order_info['CraftsmanId']))->getField('Phone');
+				$pay_api_model->sendMsg($order_info);
+			}
+		}
+		wlog($log_url,"==========end==========");
+		return json_encode(array('status'=>200,'data'=>$post_data));
 	}
 	
 	/** 
