@@ -1435,6 +1435,125 @@ class OrderApiController extends CommonController {
 	 * @return      string
 	 */
 	public function newBillBy() {
+	      //$post_data	= I('request.');
+		$exit_type	= 'json';
+		$post_string	= I('request.pos_str');
+		$key		= $this->_scrypt_pwd;
+		$model		= new \Artisans\Org\Scrypt($key);
+		$de_string	= $model->decrypt_base64($post_string);
+		parse_str($de_string, $post_data);
+		wlog('/share/newbillby.txt',$post_data);
+		
+		$user_id	= $post_data['user_id'];
+		$craft_id	= $post_data['craft_id'];
+		$pro_id		= $post_data['pro_id'];
+		$order_name	= $post_data['name'];
+		$order_phone    = $post_data['phone'];
+		$address	= $post_data['address'];
+		$city_id	= $post_data['city_id'];
+		$source		= 500;								//订单来源：第三方
+		$for_who	= 100;								//为自己预约
+	      //$address_id	= $post_data['address_id'];	 				//用户地址Id
+	        $wish		= '';
+		$lat		= $post_data['lat'];
+		$lng		= $post_data['lng'];
+		$time_data['order_date']    = $order_date    = $post_data['order_date'];
+		$time_data['order_time_id'] = $order_time_id = $post_data['order_time_id'];
+		$card_info_data['openid']   = $post_data['openid'];
+		$pay_way	= intval($post_data['pay_type']); 				//0线下支付，1线上支付
+		if($pay_way == 1) {
+			$pay_way	= 2;
+			$data['Status']	= 3;
+		}else{
+			$pay_way	= 1;
+			$data['Status']	= 0;
+		}
+		$pay_process	  = 1;
+		$price		  = $post_data['price'];
+		$artisans_model   = D('Api');
+		$reservation_time = $artisans_model->getOrderDate($time_data);
+		
+		if(!($user_id && $city_id && $price && is_numeric($price) && $lat && $lng)) {
+			return $this->returnJsonData($exit_type,300);
+		}
+		if($order_phone && !check_phone($order_phone)) {
+			return $this->returnJsonData($exit_type,1003);
+		}
+		
+		$source	 = $this->_source_from_id[$source];
+		$for_who = $this->_for_who_id[$for_who];
+		
+		//平台id
+		if($source == 3) {
+			$plat_from_id = 2;
+		}elseif($source == 4) {
+			$plat_from_id = 0;
+		}else{
+			$plat_from_id = $source;
+		}
+		
+		$city_info = $artisans_model->getCityInfo($city_id);
+		$city_name = $city_info['CityName'];
+		if($craft_id) {
+			$craft_info = M('crt_craftsmaninfo')->where(" CraftsmanId=%d ",$craft_id)->find();	//XXX信息
+		}
+		$register_info = $artisans_model->getUserInfo($user_id);					//终端用户信息
+		/*if(empty($register_info['uid'])) {
+			return $this->returnJsonData($exit_type,10003);
+		}*/
+		
+	      //$data['Status']		= 0;
+		$data['CraftsmanId']	= $craft_id;
+		$data['CraftsmanOpenid']= $craft_info['Openid'];
+		$data['CraftsmanName']	= $craft_info['TrueName'];
+		$data['UserId']		= $user_id;
+		$data['UserOpenid']	= $post_data['openid'];
+		$data['NickName']	= $register_info['username'];
+		$data['Name']		= $order_name;
+		$data['CityName']	= $city_name;
+		$data['Address']	= $address;
+		$data['Phone']		= $order_phone;
+                $data['ReservationTime']= $reservation_time? $reservation_time:Null;
+		$data['ForWho']		= $for_who;
+		$data['ShortMessage']	= $wish;
+		$data['Source']		= $source;
+		$data['Lat']		= $lat;
+		$data['Lng']		= $lng;
+		$data['PayWay']		= $pay_way;
+		$data['PayProcess']	= $pay_process;
+		$data['RecycleTxt']	= $post_data['recycle_txt'];
+		
+		//产品激励Id
+		if($pro_id) {
+			$pro_reward_id = M('prd_product_reward')->where(" State=0 and ProductId=%d ",$pro_id)->getField('Id');
+		}
+		$data['ProductRewardId'] = $pro_reward_id ? $pro_reward_id : 0;
+		
+		//$price = $price/100;		//测试时的订单价格
+	      //$product_info_data['CityId']	 = $city_id;
+	      /*$product_info_data['PlatformId'] = $plat_from_id;
+		$product_info_data['ProductId']	 = $pro_id;
+		$pro_info			 = A('Api')->getProductInfo($product_info_data);
+		$pro_info_s		       	 = $pro_info['data']; 
+	
+		if($pro_info_s['promotion']){	//产品价格
+			$pro_price	= $pro_info_s['promotion']['endPrice'];
+		}else{
+			$pro_price	= $pro_info_s['Price'];
+		}*/
+		
+		$pro_info_s			= M('prd_productinfo')->where(array('ProductId'=>$pro_id))->find();
+		$create_time			= date('Y-m-d H:i:s'); //订单创建时间
+		$data['CreaterTime']		= $create_time;
+		$data['IsDelete']		= 0;
+		$data['Price']			= $price;
+		
+	      /*$yuyue_time			= strtotime($reservation_time);
+		if($yuyue_time<time() || $yuyue_time-time()<10800) {
+			return $this->returnJsonData($exit_type,1001);
+		}*/
+		
+		$capacity_info			= $artisans_model->getCapacity($craft_id,$order_date,$order_time_id);
 		
 	}
 	
