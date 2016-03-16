@@ -1554,6 +1554,25 @@ class OrderApiController extends CommonController {
 		}*/
 		
 		$capacity_info			= $artisans_model->getCapacity($craft_id,$order_date,$order_time_id);
+		$no_use_num			= $capacity_info['NouseNum'];
+		$capacity_id			= $capacity_info['CapacityId'];
+		$data['CapacityId']		= $capacity_id;
+		
+		if(empty($no_use_num) || $no_use_num<0) {
+			return $this->returnJsonData($exit_type,1001);
+		}
+		
+		$data['VmallOrderId']		= create_order_id();
+		$time_num	= M('crt_use')->where(array('CapacityId'=>$capacity_id))->count(); 	//XX是否占用
+		if($time_num>0) {
+			return $this->returnJsonData($exit_type,1000);
+		}
+		
+		//开启回滚
+		$trans_model	= M();
+		$trans_model->startTrans();
+		$trans_status	= true;
+		
 		
 	}
 	
