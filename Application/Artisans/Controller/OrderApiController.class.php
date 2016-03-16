@@ -1254,7 +1254,30 @@ class OrderApiController extends CommonController {
 	 * @return string
 	 */
 	public function updatePayWay($param=null) {
+		if(isset($param)){
+			$post_data	= $param;
+			$exit_type	= 'array';
+		}else{
+			$post_data	= I('request.');
+			$exit_type	= 'json';
+		}
 		
+		$vmall_order_id		= $param['vmall_order_id'];
+		$pay_way		= $param['pay_way'];
+		
+		if(!($vmall_order_id && $pay_way)) {
+			return $this->returnJsonData($exit_type,300);
+		}
+		if(!in_array($pay_way,$this->_pay_way)) {
+			return $this->returnJsonData($exit_type,2004);
+		}
+		
+		$id = M('ord_orderinfo')->where(array('VmallOrderId'=>$vmall_order_id))->save(array('PayWay'=>$pay_way));
+		if($id) {
+			return $this->returnJsonData($exit_type,200);
+		}else{
+			return $this->returnJsonData($exit_type,2007,array(),'更新支付方式失败');
+		}
 	}
 	
 	/**
@@ -1271,7 +1294,87 @@ class OrderApiController extends CommonController {
 	 * @return string
 	 */
 	public function getProPrice($param=null) {
+		//获取产品价格 经度、纬度、地址、XXXid,产品id,城市id
+		if(isset($param)){
+			$post_data	= $param;
+			$exit_type	= 'array';
+		}else{
+			$post_data	= I('request.');
+			$exit_type	= 'json';
+		}
 		
+		$pro_id		= $post_data['pro_id'];
+		$lat		= $post_data['lat'];
+		$lng		= $post_data['lng'];
+		$craft_id	= $post_data['craft_id'];
+		$city_id	= $post_data['city_id'];
+		$source_from	= $post_data['source_from'];
+		$user_id	= $post_data['user_id'];
+		$pay_process	= $post_data['pay_process']; 	//支付流程
+		$pay_way	= $post_data['pay_way']; 	//支付方式
+		$platform_id	= $post_data['platform_id'];
+		
+		if(!($pro_id && $lat && $lng && $craft_id && $city_id && $source_from && $user_id)) {
+			return $this->returnJsonData($exit_type,300);
+		}
+		if(!in_array($source_from,$this->_source_from)) {
+			return $this->returnJsonData($exit_type,2001);
+		}
+		
+		$product_info_data['CityId']	 = $city_id;
+		$product_info_data['PlatformId'] = $platform_id;
+		$product_info_data['ProductId']	 = $pro_id;
+		
+		$pro_info 	= A('Api')->getProductInfo($product_info_data);
+		$pro_info_s	= $pro_info['data'];
+		$price		= 200; //默认产品价格
+		if($pro_info_s['promotion']) {
+			$price	= $pro_info_s['promotion']['endPrice'];
+		}else{
+			$price	= $pro_info_s['Price'];
+		}
+		unset($pro_info,$product_info_data);
+		$source		= $this->_source_from_id[$source_from];
+		
+		$api_model	= D('Api');
+		$first		= false;
+		if($pro_info_s && is_array($pro_info_s)) {
+			if(in_array($source,array(2,3))) {
+				//app首单减5元
+				$count	= $api_model->isFirstOrder($user_id,array(2,3));
+				if($count == 0) {
+					$first	= true;
+					$price	= ($price-5)<0? 0:($price-5);
+				}
+			}
+		}else{
+			return $this->returnJsonData($exit_type,2003);
+		}
+		
+		//上门费
+		$craft_param	= array(
+				'CraftsmanId'=>$craft_id,
+				'lat'=>$lat,
+				'lng'=>$lng,
+		);
+		
+		$craft_info_s	= A('Api')->getCraftsManInfo($craft_param);
+		$trave_price 	= ceil($craft_info_s['data']['Distance'])*2;
+		$trave_price 	= $trave_price>0? $trave_price:0;
+		unset($craft_info_s);
+		
+		//上门费超过80元 或者XXXid为空【正常支付或者40公里】
+		if(($trave_price>80 || empty($craft_id)) && (in_array($pay_process,array(1,4)))) {
+			$trave_price	= 80;
+		}
+		
+		//线下支付  需要加上门费
+		if($pay_way == 1) {
+			$price	= $price+$trave_price;
+		}
+		
+		$data['price']	= $price;
+		return $this->returnJsonData($exit_type,200,$data);
 	}
 	
 	/**
@@ -1281,7 +1384,31 @@ class OrderApiController extends CommonController {
 	 * @return	string
 	 */
 	public function sendAppMsg($param=null) {
+		if(isset($param)){
+			$post_data	= $param;
+			$exit_type	= 'array';
+		}else{
+			$post_data	= I('request.');
+			$exit_type	= 'json';
+		}
+		$order_id		= $post_data['order_id'];
+		if(!$order_id) {
+			return $this->returnJsonData($exit_type,300);
+		}
 		
+		$order_info		= M('ord_orderinfo')->where(array('OrderId'=>$order_id))->find();
+		if(empty($order_info)) {
+			return $this->returnJsonData($exit_type,2005);
+		}
+		
+		$pro_info			= M('ord_order_item')->where("OrderId=%d",$order_id)->field('ProductName,ProductId')->find();
+		$order_info['product_name']	= $pro_info['ProductName'];
+		$order_info['product_id']	= $pro_info['ProductId'];
+		$order_info['craft_phone']	= M('crt_craftsmaninfo')->where(array('CraftsmanId'=>$order_info['CraftsmanId']))->getField('Phone');
+		
+		$pay_api_model	= D('PayApi');
+		$pay_api_model->sendMsg($order_info);
+		return $this->returnJsonData($exit_type,200);
 	}
 	
 	//更新订单状态接口
