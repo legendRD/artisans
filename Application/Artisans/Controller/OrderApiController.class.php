@@ -1729,5 +1729,63 @@ class OrderApiController extends CommonController {
 		$data['IndexSource'] 		= $post_data['index_source']; //首页来源
 		$coupons_id			= $post_data['coupons_id'];
 		
+		$artisans_model			= D('Api');
+		$reservation_time		= $artisans_model->getOrderDate($time_data);
+		
+		if(!($user_id && $for_who && $city_id && $source && $pay_process && $pay_way)) {
+			return $this->returnJsonData($exit_type,300);
+		}
+		if(!in_array($source,$this->_source_from)) {
+			return $this->returnJsonData($exit_type,2001);
+		}
+		if(!in_array($for_who,$this->_for_who)) {
+			return $this->returnJsonData($exit_type,2002);
+		}
+		if($order_phone && !check_phone($order_phone)) {
+			return $this->returnJsonData($exit_type,1003);
+		}
+		if(!in_array($pay_process,$this->_pay_process)) {
+			return $this->returnJsonData($exit_type,10004);
+		}
+		
+		$source	= $this->_source_from_id[$source];
+		$for_who= $this->_for_who_id[$for_who];
+		
+		//平台
+		if($source == 3) {
+			$plat_from_id = 2;
+		}else{
+			$plat_from_id = $source;
+		}
+		
+		$city_info = $artisans_model->getCityInfo($city_id);
+		$city_name = $city_info['CityName'];
+		
+		if($craft_id) {
+			$craft_info = M('crt_craftsmaninfo')->where(" CraftsmanId=%d ", $craft_id)->find();	//XXX信息
+		}
+		$register_info	= $artisans_model->getUserInfo($user_id); 				        //终端用户信息
+		
+		$data['Status']			= 0;
+		$data['CraftsmanId']		= $craft_id;
+		$data['CraftsmanOpenid']	= $craft_info['Openid'];
+		$data['Phone']			= $order_phone;
+		$data['ReservationTime']	= $reservation_time? $reservation_time:Null;
+		$data['ForWho']			= $for_who;
+		$data['ShortMessage']		= $wish;
+		$data['Source']			= $source;
+		$data['AddressId']		= $address_id;
+		$data['Lat']			= $lat;
+		$data['Lng']			= $lng;
+		$data['PayWay']			= $pay_way;
+		//客服导购，客服用户名放入CraftsmanName
+		if($pay_process	== 2) { 
+			$data['CraftsmanName']	= $enginner_name;
+            	}else{
+			$data['CraftsmanName']	= $craft_info['TrueName'];
+		}
+		
+		
+		$data['PayProcess']	= $pay_process;
 	}
 }
