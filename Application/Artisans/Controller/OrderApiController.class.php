@@ -2016,8 +2016,81 @@ class OrderApiController extends CommonController {
 			$addpackage['order_id']		= $order_id;
 			$addpackage['package_id']	= $package_id;
 			$trans_status			= $this->addPackage($addpackage);	//订单套餐明细
+		}
+		if($trans_status) {
+			$trans_model->commit();
 			
+			//线下支付 或者 支付金额为0 ： 核销卡券并给用户发送消息
+			if( $data['Price'] == 0 || $pay_way==1 ) {
+				$pay_success_data			= $data;
+				$pay_success_data['cardid']		= $card_info_data['cardid'];
+				$pay_success_data['codeid']		= $card_info_data['codeid'];
+				$pay_success_data['product_name']	= $pro_info_s['name'];
+				$pay_success_data['product_id']		= $pro_info_s['ProductId'];
+			      //$pay_success_data['remote_type']	= $craft_info['remoteType'];
+				$pay_success_data['craft_phone']	= $craft_info['Phone'];
+				$pay_success_data['coupons_id']		= $coupons_id;
+				$pay_success_data['code_pay_way']	= $code_pay_way;
+				
+				$this->_paySuccessDeal($pay_success_data);
+				unset($pay_success_data);
+			}
+			$data['product_name']	= $addpackage['product_name'];
+			unset($addpackage);
 			
+			$new_data		= D('Comm')->lowercaseKey($data);
+			
+			//初始化中心支付单数据
+			$data_pay['appid']            = '';
+		        $data_pay['mch_id']           = '';
+		        $data_pay['device_info']      = 'web';
+		        $data_pay['key']              = '';
+		        $data_pay['paymentType']      = 'Wx';
+		        $data_pay['access_token']     = $token;
+		        $data_pay['spbill_create_ip'] = $_SERVER["REMOTE_ADDR"];
+		        $data_pay['trade_type']       = 'JSAPI';
+		        $data_pay['body']             = $orderData['body'];                       //商品或支付单简要描述
+		        $data_pay['out_trade_no']     = $centerOrder['data']['out_trade_no'];     //支付单号
+		        $data_pay['total_fee']        = $centerOrder['data']['total_fee'];        //订单总额
+		        $data_pay['openid']           = $post_data['openid'];                     //用户openid
+		        
+		        $data_pay                 = json_encode($data_pay);
+	        	$centerPayOrder           = send_curl($urlPayOrder, $data_pay);
+	        	
+	        	wlog('/share/sunshine.log', '2');
+            		wlog('/share/sunshine.log', $centerPayOrder);
+            		
+            		$centerPayOrder           = json_decode($centerPayOrder, true);
+            		$new_data['pay_data'] 	  = $centerPayOrder['data'];
+            		
+            		$appId     = trim($centerPayOrder['data']['appid']);
+	            	$timeStamp = time() . '';
+	            	$nonceStr  = trim($centerPayOrder['data']['nonce_str']);
+	            	$package   = trim('prepay_id='.$centerPayOrder['data']['prepay_id']);
+	            	$signType  = 'MD5';
+	            	
+	            	$paysign_config = compact('appId', 'timeStamp', 'nonceStr', 'package', 'signType');
+	            	ksort($paysign_config);
+	            	$str = urldecode(http_build_query($paysign_config)).'&key=字符串key的内容';
+	            	$paySign = strtoupper(md5($str));
+	            	
+	            	$new_data['wx_data'] = [
+	            		'appId'     => $appId,
+	            		'timeStamp' => $timeStamp,
+	            		'nonceStr'  => $nonceStr,
+	            		'package'   => $package,
+	            		'signType'  => $signType,
+	            		'paySign'   => $paySign
+	            	];
+	            	
+	            	wlog('/share/sunshine.log', '2');
+                	wlog('/share/sunshine.log', $new_data['wx_data']);
+                	
+                	ob_clean();
+                	return $this->returnJsonData($exit_type, 200, $new_data);
+		}else{
+			$trans_model->rollback();
+			return $this->returnJsonData($exit_type, 2007, array(), '创建订单失败');
 		}
        }
 }
