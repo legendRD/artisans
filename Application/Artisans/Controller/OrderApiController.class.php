@@ -1695,6 +1695,39 @@ class OrderApiController extends CommonController {
 	 * @return string
 	 */
 	public function createOrder2($param=null) {
+		if(isset($param)) {
+			$post_data	= $param;
+			$exit_type	= 'array';
+		}else{
+			$post_data	= I('request.');
+			$exit_type	= 'json';
+		}
+		
+		$user_id	= $post_data['user_id'];
+		$craft_id	= $post_data['craft_id'];
+		$pro_id		= $post_data['pro_id'];
+		$order_name	= $post_data['name'];
+		$order_phone    = $post_data['phone'];
+		$address	= $post_data['address'];
+		$city_id	= $post_data['city_id'];
+		$source		= $post_data['source_from']; 	 //订单来源【可选值100微信，200web,300安卓，400ios】
+		$address_id	= $post_data['address_id'];	 //用户地址Id
+		$for_who	= $post_data['for_who'];	 //为谁预约【100为自己，200为朋友】
+		$wish		= $post_data['wish'];
+		$lat		= $post_data['lat'];
+		$lng		= $post_data['lng'];
+		$time_data['order_date']	= $order_date	 = $post_data['order_date'];
+		$time_data['order_time_id']	= $order_time_id = $post_data['order_time_id'];
+		$card_info_data['codeid'] 	= $post_data['order_codeid']; //卡券
+		$card_info_data['cardid'] 	= $post_data['order_cardid'];
+		$card_info_data['openid'] 	= $post_data['openid'];
+		$pay_way			= $post_data['pay_way'];	//array(1=>'线下支付',2=>'微信系统微信支付',3=>'vmall微信支付',4=>'vmall支付宝支付');
+		$package_id			= $post_data['package_id'];     //套餐id
+		$pay_process    		= $post_data['pay_process'];	//支付流程：1正常支付，2客服引导，3客服专家在线，4.距离大于40公里支付
+		$ip				= $post_data['ip'];	//客服专家在线,订单表中address存用户ip
+		$enginner_name  		= $post_data['enginner_name']; //客服用户名
+		$data['IndexSource'] 		= $post_data['index_source']; //首页来源
+		$coupons_id			= $post_data['coupons_id'];
 		
 	}
 }
