@@ -1762,9 +1762,9 @@ class OrderApiController extends CommonController {
 		$city_name = $city_info['CityName'];
 		
 		if($craft_id) {
-			$craft_info = M('crt_craftsmaninfo')->where(" CraftsmanId=%d ", $craft_id)->find();	//XXX信息
+			$craft_info 	= M('crt_craftsmaninfo')->where(" CraftsmanId=%d ", $craft_id)->find();	//XXX信息
 		}
-		$register_info	= $artisans_model->getUserInfo($user_id); 				        //终端用户信息
+		$register_info		= $artisans_model->getUserInfo($user_id); 				//终端用户信息
 		
 		$data['Status']			= 0;
 		$data['CraftsmanId']		= $craft_id;
@@ -1778,6 +1778,7 @@ class OrderApiController extends CommonController {
 		$data['Lat']			= $lat;
 		$data['Lng']			= $lng;
 		$data['PayWay']			= $pay_way;
+		
 		//客服导购，客服用户名放入CraftsmanName
 		if($pay_process	== 2) { 
 			$data['CraftsmanName']	= $enginner_name;
@@ -1785,7 +1786,109 @@ class OrderApiController extends CommonController {
 			$data['CraftsmanName']	= $craft_info['TrueName'];
 		}
 		
-		
 		$data['PayProcess']	= $pay_process;
+		
+		//产品激励Id
+		if($pro_id){
+			$pro_reward_id = M('prd_product_reward')->where(" State=0 and ProductId=%d ",$pro_id)->getField('Id');
+		}
+		$data['ProductRewardId']	= $pro_reward_id? $pro_reward_id:0;
+		
+		//获取产品价格，默认产品价格200
+		$price	= 200; 
+		if($pro_id && $pay_process <> 2) {
+			$product_info_data['CityId']	 = $city_id;
+			$product_info_data['PlatformId'] = $plat_from_id;
+			$product_info_data['ProductId']	 = $pro_id;
+			
+			$pro_info	= A('Api')->getProductInfo($product_info_data);
+			$pro_info_s	= $pro_info['data'];
+			
+			if($pro_info_s['promotion']) {
+				$price	= $pro_info_s['promotion']['endPrice'];
+			}else{
+				$price  = $pro_info_s['Price'];
+			}
+			unset($pro_info,$product_info_data);
+			if($pro_info_s && is_array($pro_info_s)) {
+				//app首单减5元
+				if(in_array($source, array(2, 3))) {
+					$count = $artisans_model->isFirstOrder($register_info['uid'], array(2, 3));
+					if($count == 0) {
+						$price = ($price-5)<0 ? 0 : ($price-5);
+					}
+				}
+			}else{
+				return $this->returnJsonData($exit_type,2003);
+			}
+		}
+		
+		//用户是否使用卡券
+		$pay_api_model = D('PayApi');
+		$redbag_data   = $pay_api_model->getUserCardinfo($card_info_data);
+		if($redbag_data['id']) {
+			$price = $price - $redbag_data['money'];
+			$price = $price > 0 ? $price : 0;
+			$is_use_card = true;
+		}else{
+			$is_use_card = false;
+		}
+		
+		//用户是否使用优惠券
+		$is_use_coupons = false;
+		if($is_use_card === false && $coupons_id) {
+			$coupons_info = array(
+				'source' => 1, //来源58同城
+				'phone'  => $order_phone;,
+				'coupons_id' => $coupons_id,
+				'pro_id' => $pro_id
+			);
+			$activity_data = $pay_api_model->getUserCouponsinfo($coupons_info);
+			if($activity_data['money']>0) {
+				$price = $price - $activity_data['money'];
+				$price = $price > 0 ? $price : 0;
+				$is_use_coupons = true;
+			}
+		}
+		
+		if($craft_id && $lat && $lng) {
+			//上门费
+			$craft_param = array(
+				'CraftsmanId'=>$craft_id,
+			        'lat'=>$lat,
+			        'lng'=>$lng
+			);
+			
+			$craft_info_s = A('Api')->getCraftsManInfo($craft_param);
+			$trave_price  = ceil($craft_info_s['data']['Distance'])*2;
+			$trave_price  = $trave_price>0? $trave_price:0;
+			unset($craft_info_s);
+		}
+		
+		if(($trave_price>80 || empty($craft_id)) && (in_array($pay_process,array(1,4))) ) {	//上门费超过80元 或者 XXXid为空【正常支付或者40公里】
+			$trave_price	= 80;
+		}
+		
+		//线下支付  需要加上门费
+		if($pay_way == 1) { 
+			$price	= $price+$trave_price;
+			$data['DoorFee']	= $trave_price;
+            	}else{
+			$data['DoorFee']	= 0;
+		}
+		
+		//客服导购,价格走其它产品表
+		if($pay_process	== 2) {
+			$shop_info	= M('prd_shopinfo')->where(array('shop_id'=>$pro_id,'shop_status'=>1))->find();
+			if(!$shop_info) {
+				return $this->returnJsonData($exit_type,10006);
+			}
+			$price	= $shop_info['shop_price'] ? $shop_info['shop_price'] : 300;
+		}
+		
+		$create_time			= date('Y-m-d H:i:s');  //订单创建时间
+		$data['CreaterTime']		= $create_time;
+		$data['IsDelete']		= 0;
+		$data['Price']			= $price * 100; 	//单位：分
 	}
 }
