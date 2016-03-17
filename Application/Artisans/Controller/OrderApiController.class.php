@@ -1890,5 +1890,134 @@ class OrderApiController extends CommonController {
 		$data['CreaterTime']		= $create_time;
 		$data['IsDelete']		= 0;
 		$data['Price']			= $price * 100; 	//单位：分
-	}
+		
+		//微信正常支付需要判断XX是否存在
+		if($pay_process == 1) {	
+			$capacity_info	= $artisans_model->getCapacity($craft_id, $order_date, $order_time_id);
+		
+			$no_use_num		= $capacity_info['NouseNum'];
+			$capacity_id		= $capacity_info['CapacityId'];
+			$data['CapacityId']	= $capacity_id;
+			if(empty($no_use_num) || $no_use_num<0) {
+				return $this->returnJsonData($exit_type,1001);
+			}
+		}
+        
+        	//判断XX是否被占用
+		if($pay_process == 1) {	
+			$time_num	= M('crt_use')->where(array('CapacityId'=>$capacity_id))->count();
+			if($time_num>0) {
+				return $this->returnJsonData($exit_type,1000);
+			}
+		}
+        
+		//价格为0
+		if($price == 0) {
+			$data['Status']	= 3;
+		}
+		
+		//	获取订单中心的订单ID
+		$urlOrder	 = 'http://localhost/order/create';
+		$urlAuth	 = 'http://localhost/auth';
+        	$urlPayOrder 	 = 'http://localhost/pay/ordercreate';
+        	
+        	//得到接口的access_token
+        	$getData = send_curl($urlAuth, json_encode(['realm'=>'此处填入真实的realm']));
+        	$token   = json_decode($getData, true);
+        	$token   = $token['data']['access_token'];
+        	
+        	//初始化数据
+        	$orderData = [
+        		'access_token' => $token,
+        		'body'	       => $data['Name'],
+        		'total_fee'    => $data['Price'],
+        		'source_from'  => 'weixin',
+        		'goods_num'    => '1',
+        		'product_id'   => $pro_id,
+        		'local_callback_url'=> 'http://localhost/qcs_product/index.php/Aritsans/WxPay/notice2'
+        	];
+        	
+        	//在center中创建订单
+        	$centerOrder = send_curl($urlOrder, json_encode($orderData));
+        	wlog('/share/sunshine.log', '1');
+        	wlog('/share/sunshine.log', $centerOrder);
+        	$centerOrder = json_decode($centerOrder, true);
+        	
+        	//开启回滚
+        	$trans_model = M();
+        	$trans_model->startTrans();
+        	$trans_status = true;
+        	
+        	if($centerOrder['data']['out_trade_no']) {
+        		//会员中心的订单号到本站订单中进行绑定
+        		$data['VmallOrderId'] = $centerOrder['data']['out_trade_no'];
+        	}else{
+        		$trans_status	= false;
+        	}
+        	
+        	if($pay_process == 1) {
+        		$yuyue_time	= strtotime($reservation_time);
+			if($yuyue_time<time() || $yuyue_time-time()<10800) {
+				return $this->returnJsonData($exit_type,1001);
+			}
+			$trans_status	= $artisans_model->reduceCapacity($capacity_id);	//减XX
+			if($trans_status) {
+				$trans_status	= M('crt_use')->add(array('CapacityId'=>$capacity_id,'UserId'=>$register_info['UserId'],'CreaterTime'=>$create_time));
+			}
+        	}
+        	
+        	if($trans_status) {
+            		$data['Price']	 = $price; 				//单位：元
+			$trans_status	 = M('ord_orderinfo')->add($data);	//订单基本信息
+			$data['OrderId'] = $trans_status;
+		}
+		
+		if($trans_status) {
+			$order_id				= $trans_status;
+			$order_status_info['order_id']		= $order_id;
+			$order_status_info['state']		= $data['Status'];
+			$order_status_info['create_time']	= $create_time;
+			$trans_status	= D('PayApi')->addOrderState($order_status_info);	//订单状态
+			unset($order_status_info);
+		}
+		
+		if($trans_status) {
+			if($is_use_card) {
+				$ord_pay_data['OrderId']	= $order_id;
+				$ord_pay_data['PayWay']		= 1; //卡券
+				$ord_pay_data['PayCode']	= $card_info_data['codeid'].','.$card_info_data['cardid'];
+				$ord_pay_data['PayCash']	= $redbag_data['money'];
+				$ord_pay_data['CreaterTime']	=$create_time;
+				
+				$trans_status	= M('ord_pay')->add($ord_pay_data);		//订单支付明细【卡券信息】
+				unset($ord_pay_data);
+				$code_pay_way	= 1;
+			}elseif($is_use_coupons) {
+				$ord_pay_data['OrderId']	= $order_id;
+				$ord_pay_data['PayWay']		= 3; //优惠券
+				$ord_pay_data['PayCode']	= $coupons_id;
+				$ord_pay_data['PayCash']	= $activity_data['money'];
+				$ord_pay_data['CreaterTime']	=$create_time;
+				$trans_status	= M('ord_pay')->add($ord_pay_data);		//订单支付明细【卡券信息】
+				unset($ord_pay_data);
+				$code_pay_way   = 3;
+			}
+		}
+		if($trans_status) {
+			if($pay_process	== 2) {
+				$addpackage['product_id']	= $shop_info['shop_id'];
+				$addpackage['product_name']	= $shop_info['shop_name'];
+				$addpackage['product_price']	= $shop_info['shop_price'];
+			}else{
+				$addpackage['product_id']	= $pro_info_s['ProductId'];
+				$addpackage['product_name']	= $pro_info_s['name'];
+				$addpackage['product_price']	= $price;
+			}
+			$addpackage['order_id']		= $order_id;
+			$addpackage['package_id']	= $package_id;
+			$trans_status			= $this->addPackage($addpackage);	//订单套餐明细
+			
+			
+		}
+       }
 }
