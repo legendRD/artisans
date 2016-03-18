@@ -257,5 +257,35 @@ class CraftController extends CommonController {
 		$card_info_data['openid']  = $openid;
 		
 		$pay_api_model = D('PayApi');
+		$redbag_data	= $pay_api_model->getUserCardinfo($card_info_data);
+		
+		$assign_data['redbag_data']	= json_encode($redbag_data);
+		$assign_data['openid']		= $openid;
+		
+		//线上线下支付
+		if(in_array($this->_city_id, $this->_pay_offline_cityid)) {
+			$assign_data['is_below_line']	= 1;
+        	}else{
+			$assign_data['is_below_line']	= 0;
+		}
+		
+		//优惠券信息
+		$coupons_info	= array(
+		        'source'=>1,
+		        'phone' =>$this->_get_param['phone'],
+		        'pro_id'=>$pro_id
+		);
+		$activity_data	= $pay_api_model->getUserCouponsinfo($coupons_info);
+		$assign_data['activity_data']	= json_encode($activity_data);
+		
+		$this->assign('pageHome', 'craftSelectCard');
+		$this->assign('pagename','XXXXX-支付页');
+		$this->assign('assign_data', $assign_data);
+		$this->assign('get_param', $this->_get_param);         //get参数
+		$this->assign('order_window_status', 100);
+		$this->assign('select_redbag_url', $select_redbag_url);
+		$this->assign('conf', $conf);
+		
+		$this->display('qcs_pay_order');
       }
 }
