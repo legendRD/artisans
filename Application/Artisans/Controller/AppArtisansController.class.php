@@ -2,11 +2,62 @@
 namespace Artisans\Controller;
 class AppArtisansController extends CommonController {
       //头像地址
-      private $_headimg_upload_path = '/share/weixinImg/artisans/app/headImg/";
+      private $_headimg_upload_path = "/share/weixinImg/artisans/app/headImg/";
+      private $_headimg_view_path   = "/img/weixinImg/artisans/app/headImg/";
+      
+      //设备地址
+      private $_fun_upload_path	    = "/share/weixinImg/artisans/app/fun/";
+      private $_fun_view_path	    = "/img/weixinImg/artisans/app/fun/";
+      
+      //支付完成之后请求地址
+      private $_send_url = "http://localhost/paycenter/return_verify";
+      private $_log_url  = "/share/weixinLog/artisans/app/";
+      
+      //日志开启状态
+      private $_log_open_status = false;
+      protected $info_log_url = "/share/weixinLog/artisans/app/info_log/";
+      
+      //app微信支付
+      private $_appid		= '';
+      private $_appkey		= '';
+      private $_partnerkeyid	= '';
+      private $_partnerkey	= '';
+      
+      //获取订单状态地址
+      private $_getStatus 	= "http://localhost/order/list";
+      
+      //生成订单号地址
+      private $_getTrade_url	= "http://localhost/order/addor";
+      
+      //支付接口
+      private $_orderPay_url 	= "http://localhost/Paycenter/CreatePayInfo";
+      
+      //更改用户状态和XX
+      private $_pay_log		= "/share/pay_log_url/webArtisans/";
+      
+      //长连接变为短连接
+      private $_changeUrl	= "http://localhost/Qrcode/shorturl";
+      
+      //设备类型
+      private $_fun_type	= array(1=>'手机', 2=>'平板', 3=>'笔记本', 4=>'其他');
       
       //读取配置信息的接口
       public function getConfig() {
-            
+            $this->wInfoLog('服务器配置信息，IP：'.get_ip());
+            $this->wInfoLog($_REQUEST, '接收参数=>');
+            $data = array();
+            $config_info = M('app_config')->where(array('IsDelete'=>0))->order('ConfigId desc')->field('Codes code, Jsons content')->find();
+            if($config_info) {
+            	$data['code'] = $config_info['code'];
+            	$json_arr     = explode(',', $config_info['content']);
+            	foreach($json_arr as $value) {
+            		$tmp = explode('@@', $value);
+            		$data[$tmp[0]] = $tmp[1];
+            	}
+            	$this->returnJsonData(200, $data);
+            }else{
+            	$this->returnJsonData(404);
+            }
       }
       
       //首页广告位
