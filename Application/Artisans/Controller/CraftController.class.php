@@ -288,4 +288,68 @@ class CraftController extends CommonController {
 		
 		$this->display('qcs_pay_order');
       }
+      
+      //创建订单
+      public function createOrderinfo() {
+      		$postData 	= I('post.');
+      		$openid	  	= $postData['order_openid'];
+      		$uid		= $postData['order_uid'];
+		$city_id	= $postData['order_city_id'];
+		$ip		= get_client_ip();
+		if(!($openid && $uid)) {
+			return json_encode(array('status'=>100, 'message'=>'提交失败'));
+		}
+		$order_data['user_id']		= $uid;
+		$order_data['pro_id']		= $pro_id 	= $postData['order_pro_id'];   //产品id
+		$order_data['craft_id']		= $craft_id	= $postData['order_craft_id']; //XXXid
+		$order_data['address']		= $address	= $postData['order_address'];
+		$order_data['lat']		= $lat 		= $postData['order_lat'];
+		$order_data['lng']		= $lng 		= $postData['order_lng'];
+		$order_data['order_date']	= $order_date   = $postData['order_date']; 	//预约日期
+		$order_data['order_time_id']	= $order_time_id= $postData['order_time_id']; 	//时间Id
+		$order_data['for_who']		= $for_who	= $postData['order_for_who'];   //100为自己，200为朋友
+		$order_data['wish']		= $wish		= $postData['order_wish'];
+		$order_data['name']		= $name		= $postData['order_name'];
+		$order_data['phone']		= $phone	= $postData['order_phone'];
+		$order_data['city_id']		= $city_id;
+		
+		//用户选择的卡券code和卡券Id
+		$order_data['order_codeid']	= $codeid	= $postData['order_codeid'];
+		$order_data['order_cardid']	= $cardid	= $postData['order_cardid'];
+		$order_data['openid']		= $openid;
+		
+		//array(1=>'线下支付',2=>'微信系统微信支付',3=>'vmall微信支付',4=>'vmall支付宝支付');
+		$order_data['pay_way']		= $pay_way	= $postData['order_pay_way']==2?2:1;
+		$order_data['source_from']	= 100;		//订单来源【可选值100微信，200web,300安卓，400ios】
+		$order_data['pay_process']	= $postData['order_pay_process'];	//支付流程：1正常支付，2客服引导，3客服专家在线，4.距离大于40公里支付
+		$order_data['package_id']	= '';
+		$order_data['address_id']	= 0;
+		$order_data['index_source']	= session('source');	//首页来源
+		$order_dtaa['coupons_id']	= $postData['order_activity'];	//优惠券Id
+		
+		$create_info = A('OrderApi')->createOrder2($order_data);
+		if($create_info['code'] == 200 && $create_info['data']) {
+			return json_encode(array('status'=>200, 'data'=>$create_info['data']));
+		}else{
+			return json_encode(array('status'=>0, 'message'=>$create_info['message']));
+		}
+      }
+      
+      public function returnJsonData($num, $data) {
+      		$hash = array();
+      		$txt_array = array(
+      			200=>'success',
+      			300=>'参数不正确',
+      			500=>'修改数据库失败',
+	              10000=>'写入数据失败',
+	              10001=>'没有访问权限'
+      		);
+      		$hash['status'] = $num;
+      		$hash['msg']	= $txt_array[$num];
+      		if(isset($data)) {
+      			$hash['data'] = $data;
+      		}
+      		echo json_encode($hash);
+      		exit();
+      }
 }
