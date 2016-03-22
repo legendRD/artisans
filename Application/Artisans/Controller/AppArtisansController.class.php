@@ -554,17 +554,97 @@ class AppArtisansController extends CommonController {
 	 
 	 //城市下面XXX
 	 public function cityUserinfo() {
-	       
+	        //必传参数  城市
+		//可传参数  经纬度
+		$postData	= I('request.');
+		$this->wInfoLog('城市下面XXX,IP:'.get_ip());
+		$this->wInfoLog($postData,'接收参数=>');
+		
+		$city_name	= $postData['city'];
+		$lat	= $postData['lat'];
+		$lng	= $postData['lng'];
+		if(empty($city_name)) {
+			$this->returnJsonData(300);
+		}
+		
+		$artisans_model = D('Artisans');
+		$city_info      = $artisans_model->getCityInfo($city_name);
+		$city_id	= $city_info['CityId'];
+		if(empty($city_id)) {
+			$this->returnJsonData(500);
+		}
+		
+		$var['city_id']		= $city_id;
+		$var['lat']		= $lat;
+		$var['lng']		= $lng;
+		$var['order_type']	= $postData['order'];
+		$var['currpage']	= $postData['currentPage'];
+		$var['page_size']	= $postData['pageSize'];
+		$user_info		= $artisans_model->getCityUserInfo($var);
+		if($user_info === false) {
+			$this->returnJsonData(500);
+		}
+		$hash = $this->parseUserinfo($user_info);
+		if($hash) {
+			$this->returnJsonData(200, $hash);
+		}
+		$this->returnJsonData(404);
 	 }
 	 
 	 //获取单个XXX信息
 	 public function getOneInfo() {
-	       
+	        $postData	= I('request.');
+		$this->wInfoLog('单个XXX,IP:'.get_ip());
+		$this->wInfoLog($postData,'接收参数=>');
+		
+		$craft_id = $postData['userId'];
+		if(empty($craft_id)) {
+			$this->returnJsonData(300);
+		}
+		
+		$userinfo = $artisans_model->getCraftInfo($craft_id);
+		if($userinfo) {
+			$city_info		= $artisans_model->cityInfo($userinfo['City']);
+			
+			$data['id']		= (int)$userinfo['CraftsmanId'];
+			$data['name']		= (string)$userinfo['TrueName'];
+			$data['photo']		= (string)$userinfo['HeadImgCdnUrl'];
+			$data['school']		= (string)$userinfo['Source'];
+			$data['area']		= (string)$city_info['CityName'];
+			$data['good']		= (string)$userinfo['GoodRate'];
+			$data['serviced']	= $userinfo['ServiceNum'];
+			$data['des']		= (string)$userinfo['Description'];
+			$data['skillArr']	= $artisans_model->getCraftProImg($craft_id);
+			$data['time']		= $this->getUserTime($craft_id);	//时间点的XX
+			
+			$this->returnJsonData(200, $data);
+		}else{
+			$this->returnJsonData(404);
+		}
 	 }
 	 
 	 //获取时间点XX
 	 public function getUserTime($craft_id) {
-	       
+	        if(empty($craft_id)) {
+	        	return false;
+	        }
+	        $now = time();
+	        $week_arr = array("日", "一", "二", "三", "四", "五", "六");
+	        for($i=0; $i<12; $i++) {
+	        	$tmp = array();
+	        	$tmp_time = $now+86400*$i;
+	        	$tmp['date'] = date('Y-m-d', $tmp_time);
+	        	$tmp['week'] = '星期'.$week_arr[date('w', $tmp_time)];
+	        	
+	        	$timePointInfo = $this->getTimeStatus($craft_id, $tmp['date']);
+	        	if($timePointInfo) {
+	        		$tmp['clock'] = $timePointInfo;
+	        	}else{
+	        		$tmp['clock'] = array();
+	        	}
+	        	$date_arr[] = $tmp;
+	        }
+	        return $date_arr;
 	 }
 	 
 	 public function getTimeStatus($craft_id, $date) {
