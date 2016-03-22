@@ -425,7 +425,30 @@ class AppArtisansController extends CommonController {
 	 
 	 //获取产品列表
 	 public function getServiceList() {
-	       
+	        $postData=I('param.');
+		$this->wInfoLog('产品列表,IP:'.get_ip());
+		$this->wInfoLog($postData,'接收参数=>');
+		
+		if(isset($postData['city']) && isset($postData['is_shelves'])) {
+			$param['CityId']     = (int)$postData['city'];   //城市ID
+			$param['PlatformId'] = 2;   			 //微信的平台ID
+			
+			if($postData['is_shelves']==200) {
+				$param['IsShelves'] = 0;
+			}
+			
+			if(is_numeric($postData['id'])) {
+				$param['ProductId'] = $postData['id'];
+				
+				$Service = A('Api')->getProductInfo($param);
+				if($Service['status']==200) {
+					$data[] = $Service['data'];
+				}
+			}else{
+				$param['Sorting'] = 1;      //排序方式 2为正序 1为倒
+				
+			}
+		}
 	 }
 	 
 	 //产品下面XXX
