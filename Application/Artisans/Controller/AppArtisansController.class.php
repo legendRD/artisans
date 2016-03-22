@@ -728,7 +728,9 @@ class AppArtisansController extends CommonController {
 	 
 	 //成功跳转页
 	 public function success() {
-	       
+	       $postData = I('request.');
+	       post_http($this->_send_url,$postData);
+	       $this->display();
 	 }
 	 
 	 //朋友圈
