@@ -224,7 +224,24 @@ class AppArtisansController extends CommonController {
 	 
 	 //uid绑定cid 接口
 	 public function uidBindCid($param=null) {
+	       if($param) {
+	       	  $postData = $param;
+	       }else{
+	       	  $postData=I('request.');
+		  $this->wInfoLog('uid绑定cid的接口,IP:'.get_ip());
+		  $this->wInfoLog($postData,'接收参数=>');
+	       }
 	       
+	       if (isset($postData['cid']) && isset($postData['uid']) && isset($postData['login_time'])) {
+	       	         $info = M('crt_uid_cid')->where(array('Uid'=>$postData['uid']))->select();
+	       	         if(!$info) {
+	       	         	//新设备登陆
+	       	         	$old_login_cid  = M('crt_uid_cid')->where(array('Uid'=>$postData['uid'], 'State'=>1))->getField('Cid');
+	       	         	$old_change_cid = M('crt_uid_cid')->where(array('Uid'=>$postData['uid'], 'State'=>1))->save(array('State'=>0));
+	       	         	//走极光推送
+	       	         	$array['platform'] = $data['platform'] ? $data['platform'] : 'all';
+	       	         }
+	       }
 	 }
 	 
 	 //获取时间ID 接口
