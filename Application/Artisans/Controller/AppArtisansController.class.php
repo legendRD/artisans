@@ -486,7 +486,70 @@ class AppArtisansController extends CommonController {
 	 
 	 //产品下面XXX
 	 public function proUserinfo() {
-	       
+	        $postData  = I('param.');
+		$this->wInfoLog('产品下面手艺人,IP:'.get_ip());
+		$this->wInfoLog($postData,'接收参数=>');
+		
+		if(isset($postData['id']) && isset($postData['time_id']) && isset($postData['date_s']) && $postData['date_s']>=date("Y-m-d") && isset($postData['city'])) {
+			// 必传
+			$param['ProductId']= $postData['id'];	    //产品Id
+		        $param['Capacity'] = $postData['date_s'];   //日期
+		        $param['TimeId']   = $postData['time_id'];  //时间Id
+		        $param['City']     = $postData['city'];     //城市Id
+		        
+		        // 经玮度
+		        if (isset($postData['lng'])  && isset($postData['lat'])) {
+		        	$param['lng']      = $postData['lng'];       //经度
+		        	$param['lat']      = $postData['lat'];       //玮度
+		        }
+		        
+		        // 分页
+		        if (isset($postData['currentPage'])  && isset($postData['pageSize'])) {
+		       		$param['page']     = $postData['currentPage'] ;         //当前页
+		       		$param['limit']    = $postData['pageSize'];       	//一页的数据量
+		        }
+		        
+		        //排序
+		        if(isset($postData['order'])) {
+		        	if(isset($postData['order'] == 1)) {
+		        		$param['goodRate'] = 'desc';
+		        	}elseif($postData['order'] == 2) {
+		        		$param['serviceNum'] = 'desc';
+		        	}elseif($postData['order'] == 3) {
+		        		$param['Distance'] == 'asc';
+		        	}
+		        }
+		        
+		        $stemList = A('Api')->getCraftsManList($param);
+		        if($stemList['data']) {
+		        	foreach($stemList['data'] as $k=>$v) {
+		        		$tmp['name']	= $v['trueName'];
+					$tmp['craft_id']= $v['CraftsmanId'];
+					$tmp['photo']   = C('TMPL_PARSE_STRING')['__IMG_URL__'].$v['headImg'];
+					$tmp['good']    = $v['goodRate'];
+					$tmp['serviced']= $v['serviceNum'];
+					$tmp['des']	= $v['description'];
+					$tmp['distance']= $v['Distance'];
+					foreach($v['productList'] as $ks=>$vs) {
+						$tmp['skillArr'][] = C("TMPL_PARSE_STRING")['__IMG_URL__'].$vs['classImg'];
+					}
+					$hash[] = $tmp;
+					unset($tmp);
+		        	}
+		        	if($hash) {
+		        		$return['status'] = 200;
+		        		$return['msg']	  = 'success';
+		        		$return['data']   = $hash;
+		        	}
+		        }else{
+		        	$return['status'] = 404;
+		        	$return['msg']	  = '没有数据';
+		        }
+		}else{
+			$return['status']=300;
+			$return['msg']='缺少参数/参数格式不正确';
+		}
+		json_return($return, $postData['test']);
 	 }
 	 
 	 //城市下面XXX
