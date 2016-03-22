@@ -349,12 +349,78 @@ class AppArtisansController extends CommonController {
 	 
 	 //查询用户信息
 	 public function selectUser() {
-	       
+	        $postData=I('param.');
+		$this->wInfoLog('查询用户信息,IP:'.get_ip());
+		$this->wInfoLog($postData,'接收参数=>');
+		
+		if(isset($postData['user_id'])) {
+			$info['uid'] = $postData['user_id'];
+			$user_center_info = send_curl(C('ArtisansApi').'/UserCenterApi/getUserInfo', $info);
+			$user = json_decode($user_center_info, 'true');
+			if($user['code'] == 200) {
+				$data['user_id']   = (int)$user['data']['uid'];
+				$data['name']	   = (string)$user['data']['nickname'];
+				$data['lastLogin'] = date("Y-m-d H:i:s", $user['data']['last_login_time']);
+				$data['headImg']   = C("TMPL_PARSE_STRING")['__IMG_URL__'].$user['data']['avatar'];
+				$data['cdate']	   = date("Y-m-d H:i:s", $user['data']['regdate']);
+				$data['udate']	   = date("Y-m-d H:i:s");
+				$data['phone']     = (string)$user['data']['other'];
+				
+				$return['status']  = 200;
+				$return['msg']     = 'success';
+				$return['data']    = $data;
+			}
+		}else{
+			$return['status']=300;
+			$return['msg']='缺少参数';
+		}
+		json_return($return, $postData['test']);
 	 }
 	 
 	 //更新用户信息
 	 public function updateUser() {
-	       
+	        $postData	= I('request.');
+		$this->wInfoLog('更新用户信息,IP:'.get_ip());
+		$this->wInfoLog($postData,'接收参数=>');
+		
+		if(isset($postData['user_id'])) {
+			if($_FILES['img']) {
+				$img_root_path = C("UPLOAD_WX_IMG");
+				$save_path     = "./artisans/app/headImg/";
+				$config        = array(
+					 'maxSize'=>1048576,
+					'rootPath'=>$img_root_path,
+					'savePath'=>$save_path,
+					'saveName'=>array('uniqid', ''),
+					    'exts'=>array('jpg', 'gif', 'png', 'jpeg'),
+					 'autoSub'=>true,
+					 'subName'=>array('date', 'Ymd')
+				);
+				
+				//实例化上传类
+				$upload = new \Think\Upload($config);
+				$info   = $upload->uploadOne($_FILES['img']);
+				if($info) {
+					$data['HeadImgUrl'] = C("VIEW_WX_IMG").trim($save_path, './').'/'.$info['savename'];
+					$param['avatar']    = $data['HeadImgUrl'];
+				}else{
+					$return['status']   = 1005;
+					$return['msg']      = $upload->getErrorMsg();
+				}
+			}
+			$param['uid'] = $postData['user_id'];
+			if(isset($postData['name'])) {
+				$param['nickname'] = $postData['name'];
+			}
+			$user_center_info = send_curl(C("ArtisansApi").'/UserCenterApi/updateUserInfo', $param);
+			$user = json_decode($user_center_info, true);
+			$return['status'] = $user['code'];
+			$return['msg']    = $user['message'];
+		}else{
+			$return['status'] = 300;
+			$return['msg']='缺少参数';
+		}
+		json_return($return, $postData['test']);
 	 }
 	 
 	 //获取产品列表
