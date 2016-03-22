@@ -239,7 +239,34 @@ class AppArtisansController extends CommonController {
 	       	         	$old_login_cid  = M('crt_uid_cid')->where(array('Uid'=>$postData['uid'], 'State'=>1))->getField('Cid');
 	       	         	$old_change_cid = M('crt_uid_cid')->where(array('Uid'=>$postData['uid'], 'State'=>1))->save(array('State'=>0));
 	       	         	//走极光推送
-	       	         	$array['platform'] = $data['platform'] ? $data['platform'] : 'all';
+	       	         	$array['platform'] 	= $data['platform'] ? $data['platform'] : 'all';
+	       	         	$array['audience'] 	= "{'registration_id':{$old_change_cid}}";
+	       	         	$array['msg_content']   = '你的账号在另一台设备登陆';
+	       	         	$array['title']		= '标题';
+	       	         	$array['content_type']  = '类型';
+	       	         	$array['extras']	= json_encode(array('type'=>'30', 'uid'=>$postData['uid'], 'code'=>(string)$postData['login_time']));
+	       	         	
+	       	         	$url			= C('JPUSH_API');
+	       	         	list($t1, $t2)		= explode(' ', microtime());
+	       	         	$start 			= (float)sprintf('%.0f', (floatval($t1)+floatval($t2))*1000);
+	       	         	file_put_contents('/share/weixinLog/artisans/jpush.txt', 'start:'.$start, FILE_APPEND);
+	       	         	$ret		        = send_curl($url, $array);
+	       	         	$result 		= json_decode($ret);
+	       	         	$res  			= (array)$result;
+	       	         	if(res['isok']) {
+	       	         		list($t1, $t2) = explode(' ', microtime());
+	       	         		$end = (float)sprintf('%.0f', (floatval($t1) + floatval($t2))*1000);
+	       	         		file_put_contents('/share/weixinLog/artisans/jpush.txt', 'end:'.$end, FILE_APPEND);
+	       	         	}
+	       	         	
+	       	         	//为新设备添加绑定
+	       	         	$add['Uid'] 	    = $postData['uid'];
+	       	         	$add['Cid'] 	    = $postData['cid'];
+	       	         	$add['CreaterTime'] = date('Y-m-d H:i:s');
+	       	         	$add['State']	    = 1;
+	       	         	$add['CidType']     = 0;
+	       	         	$add['Code']        = $postData['login_time'];
+	       	         	$res		    = M('crt_uid_cid')->add($add);
 	       	         }
 	       }
 	 }
