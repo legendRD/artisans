@@ -333,7 +333,18 @@ class AppArtisansController extends CommonController {
 	 
 	 //获取时间ID 接口
 	 public function getTimeId($param=null) {
-	       
+	        $postData=I('param.');
+		$this->wInfoLog('获取时间Id的接口,IP:'.get_ip());
+		$this->wInfoLog($postData,'接收参数=>');
+
+		$field[]='TimeId as timeid';
+		$field[]='StartTime as time';
+		$where['IsDelete']=0;
+		$time=M('prd_servicetime')->field($field)->where($where)->select();
+		$return['status']=200;
+		$return['msg']='success';
+		$return['data']=$time;
+		json_return($return,$postData['test']);
 	 }
 	 
 	 //查询用户信息
