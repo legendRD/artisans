@@ -653,7 +653,62 @@ class AppArtisansController extends CommonController {
 	 
 	 //添加设备
 	 public function addEquipment() {
-	       
+	        $postData	= I('request.');
+		$this->wInfoLog('添加设备,IP:'.get_ip());
+		$this->wInfoLog($postData,'接收参数=>');
+		
+		if($_FIELS['img']) {
+			$file = $_FILES['img'];
+			$count = count($file['name']);
+			if($count>4) {
+				$this->returnJsonData(1002);
+			}else{
+				$img_root_path = C("UPLOAD_WX_IMG");
+				$save_path     = './artisans/app/fun/';
+				$config        = array(
+					'maxSize'=>2097152, //设置附件上传大小 2M
+					'rootPath'=>$img_root_path,
+					'savePath'=>$save_path,
+					'saveName'=>array('uniqid',''),
+					'exts'=>array('jpg', 'gif', 'png', 'jpeg'),
+					'autoSub'=>true,
+					'subName'=>array('date','Ymd')
+				);
+				$upload = new \Think\Upload($config);	//实例化上传类
+				$info   = $upload->upload();
+				if($info) {
+					foreach($info as $key=>$val) {
+						$data['ImgUrl'.($key+1)] = C('VIEW_WX_IMG').trim($save_path,'./').'/'.$val['savename'];
+					}
+				}else{
+					$this->returnJsonData(1005, array(), $upload->getErrorMsg());
+				}
+				$user_id = (int)$postData['user_id'];
+				$type	 = $postData['type'];
+				if(!($user_id && $type)) {
+					$this->returnJsonData(300);
+				}
+				$fun_type	= $this->_fun_type;
+				if(!$fun_type[$type]) {
+					$this->returnJsonData(500);
+				}
+				$content = trim($postData['content']);
+				
+				$artisans_model      = D('Artisans');
+				$data['UserId']      = $user_id;
+				$data['Type']        = $type;
+				$data['Description'] = $content;
+				$data['CreateTime']  = date("Y-m-d H:i:s");
+				$id  		     = M('cut_fun')->add($data);
+				if($id) {
+					$hash['fun_id'] = $id;
+					$this->returnJsonData(200, $hash);
+				}else{
+					$this->returnJsonData(500);
+				}
+			}
+		}
+		$this->returnJsonData(300);
 	 }
 	 
 	 //我的设备
