@@ -446,9 +446,42 @@ class AppArtisansController extends CommonController {
 				}
 			}else{
 				$param['Sorting'] = 1;      //排序方式 2为正序 1为倒
-				
+				if(is_numeric($postData['num'])) {
+					$param['limit'] = $postData['num']; //分类
+					$param['page']  = 1;		    //分类
+				}
+				$Service = A('Api')->getProductList($param);
+				if($Service['status'] == 200) {
+					$data = $Service['data'];
+				}
 			}
+			if($data) {
+				foreach($data as $key => $val) {
+					$tmp['serviceUrl']  = "http://".$_SERVER['HTTP_HOST'].__APP__."/Artisans/Craft/proDetails/ProductId/".$val['ProductId']."/Plat/app/acity/".$postData['city'];
+					$tmp['serviceName'] = (string)$val['title'];
+					$tmp['serviceId']   = (int)$val['ProductId'];
+					$tmp['txt']	    = (string)$val['Description'];
+					$tmp['basePrice']   = $val['promotion']['endPrice'] ? (string)$val['promotion']['endPrice'] : (string)$val['Price'];
+					$tmp['status']      = ($postData['is_shelves']==200 && isset($postData['is_shelves'])) ? 200 : 100;
+					$tmp['discount']    = $val['promotion']['discount'] ? (string)$val['promotion']['discount'] : '0';
+					$tmp['logoUrl']     = C('TMPL_PARSE_STRING')['__IMG_URL__'].$val['classImg'];
+					$tmp['detailUrl']   = C('TMPL_PARSE_STRING')['__IMG_URL__'].$val['BannerImgUrl'];
+					$hash[] 	    = $tmp;
+				}
+			}
+			if($hash) {
+				$return['status'] = 200;
+				$return['msg']    = 'success';
+				$return['data']   = $hash;
+			}else{
+				$return['status'] = 404;
+				$return['msg']    = '没有数据';
+			}
+		}else{
+			$return['status'] = 300;
+			$return['msg']    = '缺少参数';
 		}
+		json_return($return, $postData['test']);
 	 }
 	 
 	 //产品下面XXX
