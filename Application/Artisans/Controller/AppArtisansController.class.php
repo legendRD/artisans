@@ -846,17 +846,129 @@ class AppArtisansController extends CommonController {
 	 
 	 //朋友圈
 	 public function friendCircle() {
-	       
+	        $postData		= I('request.');
+		$this->wInfoLog('fun朋友圈,IP:'.get_ip());
+		$this->wInfoLog($postData,'接收参数=>');
+		
+		$currentPage	= $postData['currentPage']>0? (int)$postData['currentPage']:1;
+		$pageSize	= $postData['pageSize']   >0? (int)$postData['pageSize']   :5;
+		if(!($currentPage && $pageSize)) {
+			$this->returnJsonData(300);
+		}
+		
+		$count = M('cut_fun')->count();
+		if($count > 0) {
+			$totalPage = ceil($count/$pageSize);
+			$totalPage = $totalPage > 0 ? $totalpage : 1;
+			if($currentPage < = $totalPage) {
+				$info = M("cut_fun")->order("CreateTime desc")->limit(($currentPage-1)*$pageSize, $pageSize)->select();
+				if($info) {
+					$artisans_model = D("Artisans");
+					foreach($info as $key=>$val) {
+						$user_info	       = $artisans_model->getUser2($val['UserId']);
+						$head_img	       = $user_info['headImg'];
+						$data[$key]['id']      = $val['FunId'];
+						$data[$key]['type']    = (string)$this->_fun_type[$val['Type']];
+						$data[$key]['content'] = (string)$val['Description'];
+						$data[$key]['pic']     = (string)$head_img;
+						$data[$key]['name']    = (string)$user_info['name'];
+						$data[$key]['img']     = array();
+						
+						$img1	= $artisans_model->getImgUrl($val['ImgCdnUrl1'],$val['ImgUrl1']);
+						$img2	= $artisans_model->getImgUrl($val['ImgCdnUrl2'],$val['ImgUrl2']);
+						$img3	= $artisans_model->getImgUrl($val['ImgCdnUrl3'],$val['ImgUrl3']);
+						$img4	= $artisans_model->getImgUrl($val['ImgCdnUrl4'],$val['ImgUrl4']);
+						
+						if($img1) {
+							$data[$key]['img'][] = $img1;
+						}
+						if($img2) {
+							$data[$key]['img'][] = $img2;
+						}
+						if($img3) {
+							$data[$key]['img'][] = $img3;
+						}
+						if($img4) {
+							$data[$key]['img'][] = $img4;
+						}
+						
+						$data[$key]['priseNum'] = (int)$val['UpNum'];
+						$data[$key]['cdate']    = (string)$val['CreateTime'];
+					}
+					$this->returnJsonData(200, $data);
+				}
+			}
+		}
+		$this->returnJsonData(404);
 	 }
 	 
 	 //产品详情页
 	 public function productDetails() {
-	       
+	        $postData	= I('request.');
+		$this->wInfoLog('产品详情页,IP:'.get_ip());
+		$this->wInfoLog($postData,'接收参数=>');
+		
+		$pro_id	= $postData['id'];
+		if($pro_id) {
+			$data['url']	= "http://".I('server.HTTP_HOST')."/".C("TP_PROJECT_WEIXIN")."/index.php/Craft/proDetails/moduleId/".$pro_id."/source/100";
+			$this->returnJsonData(200, $data);
+		}else{
+			$this->returnJsonData(300);
+		}
 	 }
 	 
 	 //创建订单
 	 public function createOrderInfo() {
-	       
+	        $this->_log_open_status = true;
+		$postData		= I('request.');
+		$this->wInfoLog('创建订单,IP:'.get_ip());
+		$this->wInfoLog($postData,'接收参数=>');
+		
+		$data['user_id']	= $user_id	= $postData['user_id'];   //用户id
+		$data['craft_id']	= $craft_id	= $postData['userId'];    //XXXid
+		$data['pro_id']		= $pro_id	= $postData['serviceId']; //产品id
+		$data['name']		= $name		= $postData['name'];
+		$data['phone']		= $phone	= $postData['phone'];
+		$data['address']	= $address	= $postData['address'];
+		$data['city_id']	= $city_id 	= $postData['city_id'];
+		$data['lat']		= $lat		= $postData['lat'];
+		$data['lng']		= $lng		= $postData['lng'];
+		$data['order_date']	= $order_date	= $postData['date_s'];    //日期
+		$data['order_time_id']	= $order_time_id= $postData['time_id'];   //时间id
+		$data['address_id']	= 0;
+		$data['for_who']	= 100;
+		$data['wish']		= '';
+		$data['pay_process']	= 1; //支付流程：1正常支付，2客服引导，3客服专家在线，4.距离大于40公里支付
+		
+		//3 安卓 4 IOS
+		if($postData['source_from'] == 3) {
+			$data['source_from'] = 300;
+		}elseif($postData['source_from'] == 4) {
+			$data['source_from'] = 400;
+		}else{
+			$this->returnJsonData(1008);
+		}
+		
+		if($postData['pay_way'] == 100) {
+			$data['pay_way'] = 3;
+		}elseif($postData['pay_way'] == 200) {
+			$data['pay_way'] = 4;
+		}else{
+			$this->returnJsonData(1009);
+		}
+		
+		if(!($user_id && $craft_id && $pro_id && $city_id && $name && $phone && $address && $lat && $lng && $order_date && $order_time_id)) {
+			$this->returnJsonData(300);	
+		}
+		
+		$create_info	= A('OrderApi')->createOrder($data);
+		if($create_info['code'] == 200 && $create_info['data']) {
+			$hash['id'] = $create_info['data']['orderid'];
+			$hash['out_trade_no'] = $create_info['data']['vmallorderid'];
+			$this->returnJsonData(200, $hash);
+		}else{
+			$this->returnJsonData(1005,array(),$create_info['message']);
+		}
 	 }
 	 
 	 //获取支付链接
