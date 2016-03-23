@@ -1198,7 +1198,34 @@ class AppArtisansController extends CommonController {
 	 
 	 //获取app版本
 	 public function getAppVersion() {
-	       
+	       $postData = I("request.");
+	       $type 	 = $postData['type'];
+	       if(empty($type)) {
+	       		$this->returnJsonData(300);
+	       }
+	       switch($type) {
+	       		case 'artisans_android':
+	       			$type = 2;
+	       			break;
+	       		case 'android':
+	       			$type = 0;
+	       			break;
+	       		case 'ios':
+	       			$type = 1;
+	       			break;
+	       		default:
+	       			$type = 0;
+	       }
+	       $info = M("app_version")->where(array("VersionType"=>$type, "IsDelete"=>0))->order(" Versionid desc ")->find();
+	       if($info['Versionid']) {
+	       		$hash['versionCode']	= (string)$info['VersionNumber'];
+			$hash['versionName']	= (string)$info['VersionName'];
+			$hash['url']		= (string)"http://".$_SERVER['HTTP_HOST'].$info['DownloadUrl'];
+			$hash['is_update']	= (int)$info['IsForced'];	//1 强制更新
+			$this->returnJsonData(200, $hash);
+	       }else{
+	       		$this->returnJsonData(500);
+	       }
 	 }
 	 
 	 //插入微信支付token
@@ -1222,7 +1249,30 @@ class AppArtisansController extends CommonController {
 	 
 	 //获取订单状态
 	 public function getOrderStatus($status) {
-	       
+	       // 0 未支付，100支付失败，200取消订单，300已支付，400已服务，500已点评，600申请退款
+		switch($status){
+			case 1:
+				$status	= 100;
+				break;
+			case 2:
+				$status	= 200;
+				break;
+			case 3:
+				$status	= 300;
+				break;
+			case 4:
+				$status	= 400;
+				break;
+			case 7:
+				$status	= 500;
+				break;
+			case 8:
+				$status	= 600;
+				break;
+			default:
+				$status	= 0;
+		}
+		return $status;
 	 }
 	 
 	 //解析XXX信息
@@ -1236,7 +1286,9 @@ class AppArtisansController extends CommonController {
 	 }
 	 
 	 private function echoInfo($info, $parse='') {
-	       
+	       if($parse == 'echo_info') {
+			pp($info);
+	       }
 	 }
 	 
 	 //更新支付方式接口
