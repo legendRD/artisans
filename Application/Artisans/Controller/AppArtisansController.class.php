@@ -1435,7 +1435,16 @@ class AppArtisansController extends CommonController {
 	 
 	 //更新支付方式接口
 	 public function updatePayWay() {
-	       
+	        $postData		= I('request.');
+		if(!($postData['vmall_order_id'] && $postData['pay_way'])) {
+			$this->returnJsonData(300);
+		}
+		$update_order_info	= A('OrderApi')->updatePayWay($postData);
+		if($update_order_info['code'] == 200) {
+			$this->returnJsonData(200,$update_order_info['data']);
+		}else{
+			$this->returnJsonData(1005,array(),$update_order_info['message']);
+		}
 	 }
 	 
 	 //获取产品价格
