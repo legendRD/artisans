@@ -1230,21 +1230,73 @@ class AppArtisansController extends CommonController {
 	 
 	 //插入微信支付token
 	 public function insAppPaytoken() {
-	       
+	       $post_data = I("request.");
+	       $id	  = $postData['id'];
+	       $data['name'] = 'app微信支付token';
+	       if($id) {
+	       		$data['token_id'] = $id;
+	       		$data['valid_time'] = 5400;
+	       		$data['ctime'] = time();
+	       		$data['etime'] = time()+5400;
+	       		$id = M("wx_token_time")->add($data);
+	       		$data['id'] = $id;
+	       		if(!$id) {
+	       			wlog($this->_log_url, 'app微信支付token插入失败'.serialize($data), FILE_APPEND);
+	       		}
+	       }else{
+	       		wlog($this->_log_url, 'app微信支付token插入失败'.serialize($data), FIEL_APPEND);
+	       }
+	       echo json_encode($data);
+	       exit();
 	 }
 	 
 	 //获取签名
 	 public function get_sign_name() {
-	       
+	        //获取订单信息
+		$postData	= I('request.');
+		$type		= $postData['type'];
+		$vmall_order_id	= $postData['id'];
+		if(!($type && $vmall_order_id)) {
+			$this->returnJsonData(300);
+		}
+		
+		import('@.Org.WxPay.wxSign');
+		$wxpay_sign = new \wxSign();
+		
+		if($type == 'ios') {
+			$wxpay_sign->ios_config();
+		}
+		
+		//获取token_id
+		$where = array(
+			'name'=>'app微信支付token',
+			'ctime'=>array('lt',time()),
+			'etime'=>array('gt',time())
+		);
+		$wx_token_info	= M('wx_token_time')->where($where)->order(' id desc ')->find();
+		$token_id	= $wx_token_info['token_id'] ? $wx_token_info['token_id'] : '';
+		
+		$source_arr	= array(2,3);
+		$info		= M("ord_orderinfo")->where(array("VmallOrderId"=>$vmall_order_id, "Source"=>array("in", $source_arr)))->find();
+		$shop_info	= D('Artisans')->getOrderShopInfo($info['OrderId']);
+		$shop_name	= $shop_info['shop_name'];
+		
+		$data		= $wxpay_sign->getsign($info['VmallOrderId'], $info['Price'], $shop_name, $token_id);
+		echo json_encode($data);
+		exit();
 	 }
 	 
 	 //日志
 	 private function wInfoLog($data, $prefix='') {
-	       
-	 }
-	 
-	 public function upload_test() {
-	       
+	       if($this->_log_open_status) {
+	       		$log_suffix_name = 'info_'.date('Ymd').'.log';			//日志文件名
+	       		$log_url	 = $this->info_log_url.$log_suffix_name;	//日志文件路径
+	       		if(is_array($data)) {
+	       			wlog($log_url, $prefix, serialize($data), FILE_APPEND);
+	       		}else{
+	       			wlog($log_url,$data,FILE_APPEND);
+	       		}
+	       }
 	 }
 	 
 	 //获取订单状态
@@ -1277,7 +1329,31 @@ class AppArtisansController extends CommonController {
 	 
 	 //解析XXX信息
 	 public function parseUserinfo($userinfo) {
-	       
+	       if($userinfo && is_array($userinfo)) {
+	       		$artisans_model	= D('Artisans');
+	       		foreach($userinfo as $key=>$value) {
+	       			$tmp = array();
+	       			$tmp['name']	= (string)$value['true_name'];
+				$tmp['craft_id']= (int)$value['user_id'];
+				
+				$tmp['photo']	= $artisans_model->getImgUrl($value['head_img_cdn'],$value['head_img']);
+				
+				$tmp['school']	= (string)$value['source'];
+				$tmp['good']	= (string)$value['good_rate'];
+				$tmp['serviced']= (int)$value['service_num'];
+				$tmp['desc']	= (string)$value['description'];
+				$tmp['price']	= (string)$value['total_price'];
+				$tmp['distance']= (string)$value['distance'];
+				
+				//产品
+				$tmp['skillArr']= $artisans_model->getCraftProImg($value['user_id']);
+				
+				$hash[] = $tmp;
+	       		}
+	       		return $hash;
+	       }else{
+	       		return array();
+	       }
 	 }
 	 
 	 //返回数据
