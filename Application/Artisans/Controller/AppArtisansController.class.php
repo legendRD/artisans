@@ -1082,7 +1082,27 @@ class AppArtisansController extends CommonController {
 	 
 	 //取消订单
 	 public function cancleOrder() {
-	       
+	        $postData	= I('request.');
+		$this->wInfoLog('取消订单,IP:'.get_ip());
+		$this->wInfoLog($postData,'接收参数=>');
+		
+		$user_id	= $postData['user_id'];
+		$order_id	= $postData['id'];
+		if(!($user_id && $order_id)) {
+			$this->returnJsonData(300);
+		}
+		
+		$cancel_data = array(
+			'update_type'=>100,
+			'order_id'=>$order_id,
+			'uid'=>$user_id
+		);
+		$get_cancel_data = A("OrderApi")->updateOrder($cancel_data);
+		if($get_cancel_data['code'] == 200 && $get_cancel_data['data']) {
+			$this->returnJsonData(200);
+		}else{
+			$this->returnJsonData(500);
+		}
 	 }
 	 
 	 //XXX点评数据
