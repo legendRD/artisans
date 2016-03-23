@@ -1282,7 +1282,73 @@ class AppArtisansController extends CommonController {
 	 
 	 //返回数据
 	 public function returnJsonData($num, $data=array(), $msg='') {
-	       
+	       switch($num){
+			case 300:
+				$hash['status'] = 300;
+				$hash['msg'] = 'noparam';
+				break;
+			case 404:
+				$hash['status'] = 404;
+				$hash['msg'] = 'nodata';
+				break;
+			case 500:
+				$hash['status'] = 500;
+				$hash['msg'] = 'fail';
+				break;
+			case 508:
+				$hash['status'] = 508;
+				$hash['msg'] = '验证码错误';
+				break;
+			case 200:
+				$hash['status'] = 200;
+				$hash['msg'] = 'success';
+				$hash['data'] = $data;
+				break;
+			case 1000:
+				$hash['status']	= 1000;
+				$hash['msg']	= 'XX被占用';
+				break;
+			case 1001:
+				$hash['status']	= 1001;
+				$hash['msg']	= '无XX或XX归属不正确';
+				break;
+			case 1002: 					//fun设备上传
+				$hash['status']	= 1002;
+				$hash['msg']	= '最多上传4张图片';
+				break;
+			case 1003:
+				$hash['status']	= 1003;
+				$hash['msg']	= '手机号错误';
+				break;
+			case 1004:
+				$hash['status']	= 1004;
+				$hash['msg']	= '验证码超时';
+				break;
+			case 1005:
+				$hash['status']	= $num;
+				$hash['msg']	= $msg;
+				break;
+			case 1006:
+				$hash['status']	= 1006;
+				$hash['msg']	= '已评论';
+				break;
+			case 1007:
+				$hash['status']	= 1007;
+				$hash['msg']	= '订单已失效';
+				break;
+			case 1008:
+				$hash['status']	= 1008;
+				$hash['msg']	= '订单来源有误';
+				break;
+			case 1009:
+				$hash['status']	= 1009;
+				$hash['msg']	= '支付来源有误';
+				break;
+		}
+		$this->echoInfo($hash, $_GET['parse']);	//显示信息
+		$this->wInfoLog($hash, '返回数据=>');   //参数日志
+		echo json_encode($hash);
+		exit();
 	 }
 	 
 	 private function echoInfo($info, $parse='') {
