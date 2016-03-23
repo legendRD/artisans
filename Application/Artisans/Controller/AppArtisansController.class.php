@@ -1107,17 +1107,93 @@ class AppArtisansController extends CommonController {
 	 
 	 //XXX点评数据
 	 public function checkEvaluation() {
+	       $postData = I("request.");
+	       $craft_id = $postData['user_id'];
+	       $current_page = $postData['currentPage'] > 0 ? (int)$postData['currentPage'] : 1;
+	       $page_size = $postData['pageSize'] > 0 ? (int)$postData['pageSize'] : 5;
+	       if(empty($craft_id)) {
+	       		$this->returnJsonData(300);
+	       }
 	       
+	       $where = array("CraftsmanId"=>$craft_id);
+	       $total_size = M("prd_evaluation")->where($where)->count();
+	       if($total_size > 0) {
+	       		$total_page = ceil($total_size/$page_size);
+	       		$total_page = $total_page ? $total_page : 1;
+	       		if($current_page <= $total_page) {
+	       			$info = M("prd_evaluation")->where($where)->limit(($current_page-1)*$page_size, $page_size)->select();
+	       			if($info) {
+	       				foreach($info as $value) {
+	       					$tmp			= array();
+	       					$pro_info		= D('Artisans')->getOrderShopInfo($value['OrderId']);
+	       					$tmp['name']		= (string)$value['NickName'];
+						$tmp['des']		= (string)$value['Comments'];
+						$tmp['createTime']	= (string)$value['CreaterTime'];
+						$tmp['labelNum']	= (int)$value['StarNums'];
+						$tmp['serviceName']	= $pro_info['shop_name'];
+						$tmp['img']		= $pro_info['pro_img'];
+						$hash[] = $tmp;
+	       				}
+	       				$this->returnJsonData(200, $hash);
+	       			}
+	       		}
+	       		
+	       }
+	       $this->returnJsonData(404);
 	 }
 	 
 	 //提交点评
 	 public function createComments() {
-	       
+	       $postData	= I('request.');
+	       if($postData['source_from'] == 2) {
+	       		$postData['source_from'] = 300;
+	       }else{
+	       		$postData['source_from'] = 400;
+	       }
+	       $postData['order_id'] = $postData['orderId'];
+	       $comment_data = A('OrderApi')->createComments($postData);
+	       if($comment_data['code'] == 200) {
+			$this->returnJsonData(200);	
+	       }else{
+	       		$this->returnJsonData(1005,array(),$comment_data['message']);
+	       }
 	 }
 	 
 	 //首单减5
 	 public function reduceFiveyuan() {
-	       
+	        $postData	= I('request.');
+		$user_id	= $postData['user_id'];
+		$pro_id		= $postData['id'];
+		$city_name	= $postData['city_name'];
+		if(!($user_id && $pro_id && $city_name)) {
+			$this->returnJsonData(300);
+		}
+		$aritsans_model	= D('Artisans');
+		$city_info	= $aritsans_model->getCityInfo($city_name);
+		$city_id	= $city_info['CityId'];
+		$pro_info	= $aritsans_model->getOneProInfo($pro_id,$city_id);
+		if($pro_info && is_array($pro_info)) {
+			$pro_price	= $pro_info[0]['true_price'];
+			//app首单减5元
+			$user_info      = $artisans_model->getUser2($user_id);
+			//来源
+			$source_arr	= array(2, 3);
+			$count 		= $artisans_model->isFirstOrder($user_info['UserId'], $source_arr);
+			if($count === false) {
+				$this->returnJsonData(500);
+			}
+			if($count>0) {
+				$txt   = $pro_price.'元';
+			}else{
+				$price = ($pro_price-5)<0? 0:($pro_price-5);
+				$price = sprintf("%.2f", $price);
+				$txt   = $price.'元（首单减5元）';
+			}
+			$data['txt']   = $txt;
+			$this->returnJsonData(200, $data);
+		}else{
+			$this->returnJsonData(500);
+		}
 	 }
 	 
 	 //获取app版本
