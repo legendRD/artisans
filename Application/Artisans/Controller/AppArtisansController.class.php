@@ -803,7 +803,33 @@ class AppArtisansController extends CommonController {
 	 
 	 //设备H5页面
 	 public function appViewH5() {
+	       $postData	= I('request.');
+	       $fun_id		= $postData['id'];
+	       $fun_info        = M("cut_fun")->find($fun_id);
+	       $user_info       = M("cut_customer")->find($fun_info['UserId']);
+	       $artisans_model  = D("Artisans");
+	       $data['pic']     = "http://".$artisans_model->getImgUrl($user_info['HeadCdnImgUrl'], $user_info['HeadImgUrl']);
+	       $data['name']    = $user_info['NickName'];
+	       $img1 		= $artisans_model->getImgUrl($fun_info['ImgCdnUrl1'], $fun_info['ImgUrl1']);
+	       $img2		= $artisans_model->getImgUrl($fun_info['ImgCdnUrl2'], $fun_info['ImgUrl2']);
+	       $img3		= $artisans_model->getImgUrl($fun_info['ImgCdnUrl3'], $fun_info['ImgUrl3']);
+	       $img4		= $artisans_model->getImgUrl($fun_info['ImgCdnUrl4'], $fun_info['ImgUrl4']);
 	       
+	       if($img1) {
+	       		$data['img'][] = 'http://'.$img1;
+	       }
+	       if($img2) {
+	       		$data['img'][] = 'http://'.$img2;
+	       }
+	       if($img3) {
+	       		$data['img'][] = 'http://'.$img3;
+	       }
+	       if($img4) {
+	       		$data['img'][] = 'http://'.$img4;
+	       }
+	       if(!$data['img']) {
+	       		$data['img'][] = array();
+	       }
 	 }
 	 
 	 //成功跳转页
