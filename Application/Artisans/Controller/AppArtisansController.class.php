@@ -1041,7 +1041,43 @@ class AppArtisansController extends CommonController {
 	 
 	 //查询多个订单信息
 	 public function checkOrderInfo() {
-	       
+	        $postData	= I('request.');
+		$this->wInfoLog('多个订单信息,IP:'.get_ip());
+		$this->wInfoLog($postData,'接收参数=>');
+		
+		$data['user_id']	= $user_id	= $postData['user_id'];
+		$data['current_page']	= 1;
+		$data['page_size']	= 50;
+		if(!$user_id) {
+			$this->returnJsonData(300);
+		}
+		
+		$order_info		= A('OrderApi')->getMoreOrder($data);
+		if($order_info['code'] == 200) {
+			$tmp	= array();
+			if($order_info['data']) {
+				$order_info_s	= $order_info['data'];
+				foreach($order_info_s as $value) {
+					$hash['id']		= (int)$value['order_id'];
+					$hash['userName']	= (string)$value['name'];
+					$hash['tradeId']	= (string)$value['vmall_id'];
+					$hash['status']		= (int)$value['status'];
+					$hash['phone']		= (string)$value['phone'];
+					$hash['time']		= (string)$value['service_date'];
+					$hash['address']	= (string)$value['address'];
+					$hash['engName']	= (string)$value['craft_name'];
+					$hash['serviceName']	= (string)$value['pro_name'];
+					$hash['serviceId']	= (int)$value['pro_id'];
+					$hash['engId']		= (int)$value['craft_id'];
+					$hash['price']		= (string)$value['price'];
+					$hash['pay_way']	= (int)$value['pay_way'];
+					$tmp[] = $hash;
+				}
+			}
+			$this->returnJsonData(200,$tmp);
+		}else{
+			$this->returnJsonData(1005,array(),$order_info['message']);
+		}
 	 }
 	 
 	 //取消订单
