@@ -648,7 +648,49 @@ class AppArtisansController extends CommonController {
 	 }
 	 
 	 public function getTimeStatus($craft_id, $date) {
-	       
+	        if(!($craft_id && $date)) {
+	        	return false;
+	        }
+	        
+	        $where = array(
+			'Capacity'=>$date,
+			'CraftsmanId'=>$craft_id,
+			'NouseNum'=>array('gt',0)
+		);
+		$reservation_time = M('crt_capacity')->where($where)->field('Capacity as nowday, TimeId as time_id')->select();
+		if($reservation_time) {
+			$artisans_model = D("Artisans");
+			foreach($reservation_time as $value) {
+				$time_id_info	= $artisans_model->getTimeIdInfo($value['time_id']);
+				$start_time     = strtotime($date.' '.$time_id_info['StartTime'].':00');
+				$end_time	= strtotime($date.' '.$time_id_info['EndTime'].':00');
+				$target 	= true;
+				$i		= 0;
+				while($target) {
+					$tmp_time = $start_time + 3600 * $i;
+					if($tmp_time > = $end_time) {
+						$target = false;
+					}else{
+						$user_time[] = $tmp_time;
+						$i++;
+					}
+				}
+			}
+		}
+		$mintime = strtotime(date('Y-m-d 10:00:00', strtotime($date)));
+		for($i=0;$i<12;$i++) {
+			$tmp_time = $mintime + 3600*$i;
+			//3小时之后
+			if(in_array($tmp_time, $user_time) && ($tmp_time-time()>10800)) {
+				$tmp['time']   = date('G', $tmp_time);
+				$tmp['status'] = true;
+			}else{
+				$tmp['time']   = date('G', $tmp_time);
+				$tmp['status'] = false;
+			}
+			$data[] = $tmp;
+		}
+		return $data;
 	 }
 	 
 	 //添加设备
@@ -713,12 +755,50 @@ class AppArtisansController extends CommonController {
 	 
 	 //我的设备
 	 public function myEquipment() {
-	       
+	        $postData	= I('request.');
+		$this->wInfoLog('我的设备,IP:'.get_ip());
+		$this->wInfoLog($postData,'接收参数=>');
+		
+		$user_id = trim($postData['user_id']);
+		if(empty($user_id)) {
+			$this->returnJsonData(300);
+		}
+		
+		$artisans_model = D("Artisans");
+		if(!is_numeric($user_id)) {
+			$this->returnJsonData(500);
+		}
+		
+		$fun_info = M("cut_fun")->where(array("UserId"=>$user_id))->order("CreateTime desc")->limit(21)->select();
+		if($fun_info) {
+			foreach($fun_info as $key=>$val) {
+				$data[$key]['id']      = (int)$val['FunId'];
+				$data[$key]['type']    = (string)$this->_fun_type[$val['Type']];
+				$data[$key]['content'] = (string)$val['Description'];
+				$data[$key]['img']     = $artisans_model->getImgUrl($val['ImgCdnUrl1'], $val['ImgUrl1']);
+				$data[$key]['priseNum']= (int)$val['UpNum'];
+				$data[$key]['cdate']   = (int)$val['CreateTime'];
+				$data[$key]['url']     = (string)"http://".$_SERVER['HTTP_HOST']."/".C("TP_PROJECT_APP")."/index.php/Aritsans/AppArtisans/appViewH5?id=".$val['FunId'];
+			}
+			$this->returnJsonData(200, $data);
+		}
+		$this->returnJsonData(404);
 	 }
 	 
 	 //设备H5地址
 	 public function viewHfive() {
+	       $postData = I('request.');
+	       $this->wInfoLog('设备h5地址,IP:'.get_ip());
+	       $this->wInfoLog($postData,'接收参数=>');
 	       
+	       $fun_id   = $postData['id'];
+	       if($fun_id) {
+	       	      $url = "http://".$_SERVER['HTTP_HOST']."/".C("TP_PROJECT_APP")."/index.php/Artisans/AppArtisans/appViewH5?id=".$fun_id;
+	       	      $data['url'] = $url;
+	       	      $this->returnJsonData(200, $data);
+	       }else{
+	       	      $this->returnJsonData(300);
+	       }
 	 }
 	 
 	 //设备H5页面
