@@ -973,12 +973,70 @@ class AppArtisansController extends CommonController {
 	 
 	 //获取支付链接
 	 public function appOrderPay() {
-	       
+	        $postData = I('request.');
+		$isWeixin = $postData['type']; //web版微信100，网银200，网页淘宝300，手机淘宝400，app版微信500
+		$vmall_order_id	= $postData['id'];
+		
+		$vmall_order_id	= $postData['id'];
+		if($isWeixin == 'weixin') {
+			$data['payment_type'] = 500;
+		}elseif($isWeixin == 'zfb') {
+			$data['payment_type'] = 400;
+		}
+		
+		$data['vmall_order_id']	= $vmall_order_id;
+		$data['success_url']	= "http://localhost/".C("TP_PROJECT_APP")."/index.php/Artisans/AppArtisans/success?id=".$vmall_order_id;
+		$product_info		= A('OrderApi')->getPayOrderUrl($data);
+		if($product_info['code'] == 200 && $product_info['data']) {
+			$this->returnJsonData(200,$product_info['data']);
+		}else{
+			$this->returnJsonData(1005,array(),$product_info['message']);
+		}
 	 }
 	 
 	 //查询单个订单信息
 	 public function selectOrderInfo() {
-	       
+	        $postData	= I('request.');
+		$this->wInfoLog('单个订单信息,IP:'.get_ip());
+		$this->wInfoLog($postData,'接收参数=>');
+		
+		$user_id	  			= $postData['user_id'];
+		$data['order_id'] = $id 		= $postData['id'];
+		if(!($user_id && $id)) {
+			$this->returnJsonData(300);
+		}
+		
+		$order_info	= A('OrderApi')->getOneOrder($data); //获取订单信息
+		if($order_info['code'] == 200 && $order_info['data']) {
+			$order_info_s		= $order_info['data'];
+			
+			$hash['id']		= (int)$order_info_s['order_id'];
+			$hash['userName']	= (string)$order_info_s['name'];
+			$hash['tradeId']	= (string)$order_info_s['vmall_id'];
+			$hash['status']		= (int)$order_info_s['status'];
+			$hash['phone']		= (string)$order_info_s['phone'];
+			$hash['time']		= (string)$order_info_s['service_date'];
+			$hash['address']	= (string)$order_info_s['address'];
+			$hash['engName']	= (string)$order_info_s['craft_name'];
+			$hash['serviceName']	= (string)$order_info_s['pro_name'];
+			$hash['serviceId']	= (int)$order_info_s['pro_id'];
+			$hash['engId']		= (int)$order_info_s['craft_id'];
+			$hash['price']		= (string)$order_info_s['price'];
+			$hash['pay_way']	= (int)$order_info_s['pay_way'];
+			$hash['comment']	= '';
+			$hash['stars']		= 0;
+			$hash['cTime']		= '';
+			
+			if($order_info_s['status'] == 500) {
+				$hash['comment']= (string)$order_info_s['comments'][0]['content'];
+				$hash['stars']	= (int)$order_info_s['comments'][0]['stars'];
+				$hash['cTime']	= (string)$order_info_s['comments'][0]['create_time'];
+			}
+			unset($order_info_s);
+			$this->returnJsonData(200,$hash);
+		}else{
+			$this->returnJsonData(1005,array(),$order_info['message']);
+		}
 	 }
 	 
 	 //查询多个订单信息
