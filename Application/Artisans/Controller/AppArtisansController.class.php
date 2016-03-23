@@ -1449,6 +1449,19 @@ class AppArtisansController extends CommonController {
 	 
 	 //获取产品价格
 	 public function getProPrice() {
-	       
+	       $postData	= I('request.');
+	       if(!($postData['lat'] && $postData['lng'] && $postData['craft_id'] && $postData['pro_id'] && $postData['city_id'] && $postData['user_id'] && $postData['source_from'])) {
+			$this->returnJsonData(300);
+	       }
+	       $postData['pay_process']	= 1;
+	       $postData['pay_way']	= 3; //默认为vmall微信支付
+	       $postData['platform_id']	= 2; //平台id
+	       $update_order_info	= A('OrderApi')->getProPrice($postData);
+	       if($update_order_info['code'] == 200) {
+	       		$update_order_info['data']['price'] = (string)$update_order_info['data']['price'];
+	       		$this->returnJsonData(200, $update_order_info['data']);
+	       }else{
+	       		$this->returnJsonData(1005, array(), $update_order_info['message']);
+	       }
 	 }
 }
