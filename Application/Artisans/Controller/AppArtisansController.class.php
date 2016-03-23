@@ -487,7 +487,7 @@ class AppArtisansController extends CommonController {
 	 //产品下面XXX
 	 public function proUserinfo() {
 	        $postData  = I('param.');
-		$this->wInfoLog('产品下面手艺人,IP:'.get_ip());
+		$this->wInfoLog('产品下面XXX,IP:'.get_ip());
 		$this->wInfoLog($postData,'接收参数=>');
 		
 		if(isset($postData['id']) && isset($postData['time_id']) && isset($postData['date_s']) && $postData['date_s']>=date("Y-m-d") && isset($postData['city'])) {
@@ -830,6 +830,11 @@ class AppArtisansController extends CommonController {
 	       if(!$data['img']) {
 	       		$data['img'][] = array();
 	       }
+	       $data['txt'] = (string)$fun_info['Description'];
+	       
+	       $this->assign('data', $data);
+	       
+	       $this->display('viewHfive');
 	 }
 	 
 	 //成功跳转页
