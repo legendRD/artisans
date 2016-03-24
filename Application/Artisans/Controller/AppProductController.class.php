@@ -142,7 +142,67 @@ class AppProductController extends CommonController {
       }
       
       public function capacityShow() {
-            
+		$postData = I('request.');
+		$user_id  = $postData['user_id'];
+		if(!$user_id) {
+			$this->returnJsonData(300);
+		}
+		$beginTime 		   	  = date('Y-m-d', time());
+		$endTime   		   	  = date('Y-m-d', strtotime("+13 day"));
+		$where['Capacity'] 	  = array(array('egt', $beginTime), array('elt', $endTime));
+		$where['CraftsmanId'] = $user_id;
+		//查询14天的XX
+		$capacity  			  = M('crt_capacity')->where($where)->field("Capcaity, TimeId")->select();
+		unset($where);
+		$where['IsDelete']	  = 0;
+		//所有的可预约时间点
+		$servicetime 	      = M('prd_servicetime')->where($where)->field("TimeId, StartTime")->select();
+		$data = array();
+		//循环遍历14天的XX
+		for($i=0;$i<14;$i++) {
+			$data[$i]['date'] = date('Y-m-d', strtotime("+".$i." day"));
+			foreach($capacity as $value) {
+				//判断当天是否存在XX
+				if(date('Y-m-d', strtotime("+".$i." day")) == $value['Capcaity']) {
+						foreach ($servicetime as $v) {
+							//获取当天的具体时间点
+							if($value['TimeId'] == $v['TimeId']) {
+								$time .= $v['StartTime'].',';
+							}
+						}
+				}
+			}
+			$data[$i]['content'] = array();
+			//将时间点连城时间段
+			if($time) {
+				$newTime = substr($time, 0, strlen($time)-1);
+				$arr     = explode(',', $newTime);
+				sort($arr);
+				$p = 0;
+				foreach ($arr as $k => $v) {
+					if($arr[$k+1] == $arr[$k] + 1) {
+						$num .= $arr[$k].','.$arr[$k+1].',';
+					}else{
+						if($num) {
+							$newNum  = substr($num, 0, strlen($num)-1);
+							$content = explode(',', $newNum);
+							$len 	 = cont($content);
+							$begin   = $content[0];
+							$end     = $content[$len-1]+1;
+
+							$data[$i]['content'][$p]['service'] = '';
+							$data[$i]['content'][$p++]['time']  = $begin.'-'.$end.':00';
+							$num     = '';
+						}
+					}
+				}
+				unset($arr);
+				$time = '';
+			}
+		}
+	}
+	$array = array('user_id'=>$user_id, 'data'=>$data);
+	$this->returnJsonData(200, $array);            
       }
       
       public function capacityByCityProIdDate() {
