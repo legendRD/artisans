@@ -206,16 +206,86 @@ class AppProductController extends CommonController {
       }
       
       public function capacityByCityProIdDate() {
-            
+            	$postData = I('request.');
+         	$CityId = $postData['city_id'];
+		$ProductId = $postData['product_id'];
+		$Capacity = $postData['date'];
+		if(!$CityId || !$ProductId || !$Capacity) {
+			$this->returnJsonData(300);
+		}
+		//根据产品ID查看拥有此产品的XXX
+		$data = M('prd_product_craftsman')->where(array('ProductId'=>$ProductId))->field("CraftsmanId")->select();
+		$craftsman = array();
+		foreach ($data as $key => $value) {
+			$craftsman[$key] = $value['CraftsmanId'];
+		}
+		unset($where);
+		$where['CraftsmanId'] = array('in',$craftsman);
+		$where['Capacity'] = $Capacity;
+		$capacity = M('crt_capacity')->where($where)->field("CapacityId,Capacity,TimeId")->select();
+		unset($where);
+		$where['IsDelete'] = 0;
+		//所有的可约时间点
+		$servicetime = M('prd_servicetime')->where($where)->order('StartTime')->field("TimeId,StartTime")->select();
+		$data = array();
+		foreach($servicetime as $key => $value) {
+			if($value['TimeId'] == $v['TimeId']) {
+				$data[$k]['state'] = true;
+				break;
+			}
+			$data[$k]['time'] = $v['StartTime'];
+			$data[$k]['time_id'] = $v['TimeId'];
+		}
+		if($data) {
+			$this->returnJsonData(200,$data);
+		}else{
+			$this->returnJsonData(200,array());
+		}
       }
       
       public function capacityByuserIdDate() {
-            
+            		$postData = I('request.');
+			$Capacity = $postData['date'];
+			$CraftsmanId = $postData['user_id'];
+			$where['IsDelete'] = 0 ;
+			//所有的可约时间点
+			$servicetime = M('prd_servicetime')->where($where)->order('StartTime')->field("TimeId,StartTime")->select();
+			unset($where);
+			$where['CraftsmanId'] = $CraftsmanId;
+			$where['Capacity'] = $Capacity;
+			$capacity = M('crt_capacity')->where($where)->field("CapacityId,Capacity,TimeId")->select();
+			$data = array();
+			foreach ($servicetime as $k => $v) {
+				$data[$k]['state'] = false;
+				foreach ($capacity as $key => $value) {
+					if($value['TimeId'] == $v['TimeId']){
+						$data[$k]['state'] = true;
+						break;
+					}
+				}
+				$data[$k]['time'] = $v['StartTime'];
+				$data[$k]['time_id'] = $v['TimeId'];
+			}
+			if($data){
+				$this->returnJsonData(200,$data);
+			}else{
+				$this->returnJsonData(200,array());
+			}
       }
       
       //获取时间点
       public function getTime() {
-            
+            		$servicetime = M('prd_servicetime')->where(" IsDelete=0 ")->field("TimeId,StartTime")->order('StartTime')->select();
+			$data = array();
+			foreach ($servicetime as $key => $value) {
+				$data[$key]['time_id'] = $value['TimeId'];
+				$data[$key]['time'] = $value['StartTime'];
+			}
+			if($data){
+				$this->returnJsonData(200,$data);
+			}else{
+				$this->returnJsonData(200,array());
+			}
       }
       
       //编辑XX
