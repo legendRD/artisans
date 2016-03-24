@@ -288,12 +288,49 @@ class AppProductController extends CommonController {
 			}
       }
       
-      //编辑XX
+      //编辑
       public function updateCapacity() {
-            
+            		$postData = I('request.');
+			$user_id = $postData['user_id'];
+			if(!$user_id){
+				$this->returnJsonData(300);
+			}
+			$beginTime = date('Y-m-d',time());
+			$endTime = date('Y-m-d',strtotime("+13 day"));
+			$where['Capacity'] = array(array('egt',$beginTime),array('elt',$endTime));
+			$where['CraftsmanId'] = $user_id;
+			//查询14天的产能
+			$capacity = M('crt_capacity')->where($where)->field("CapacityId,Capacity,TimeId")->select();
+			unset($where);
+			$where['IsDelete'] = 0 ;
+			//所有的可约时间点
+			$servicetime = M('prd_servicetime')->where($where)->order('StartTime')->field("TimeId,StartTime")->select();
+			$data = array();
+			//循环遍历14天的产能
+			for($i = 0;$i < 14;$i++){
+				$data[$i]['date'] = date('Y-m-d',strtotime("+".$i." day"));
+				$data[$i]['content'] = array();
+				foreach ($servicetime as $k => $v) {
+					$data[$i]['content'][$k]['time'] = $v['StartTime'];
+					$data[$i]['content'][$k]['time_id'] = $v['TimeId'];
+					$data[$i]['content'][$k]['state'] = false;
+					$data[$i]['content'][$k]['capacity_id'] = '';
+					foreach ($capacity as $key => $value) {
+						if(date('Y-m-d',strtotime("+".$i." day")) == $value['Capacity']){
+							if($value['TimeId'] == $v['TimeId']){
+								$data[$i]['content'][$k]['state'] = true;
+								$data[$i]['content'][$k]['capacity_id'] = $value['CapacityId'];
+								break;
+							}
+						}
+					}
+				}
+			}
+			$array = array('user_id' => $user_id,'data' => $data);
+			$this->returnJsonData(200,$array);
       }
       
-      //保存XX设置
+      //保存设置
       public function setCapacity() {
             
       }
