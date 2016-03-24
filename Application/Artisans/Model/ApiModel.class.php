@@ -346,7 +346,7 @@ class ApiModel extends Model {
 	}
 	
 	/**
-	 * XXX某个时间产能信息
+	 * XXX某个时间XX信息
 	 * @param int $user_id	  XXXid
 	 * @param int $order_date 预约日期
 	 * @param int $order_time_id 预约时间Id
@@ -362,7 +362,7 @@ class ApiModel extends Model {
 	}
 	
 	/**
-	 * 判断XXX产能是否存在
+	 * 判断XXX XX是否存在
 	 * @param int $user_id	  XXXid
 	 * @param int $order_date 预约日期
 	 * @param int $order_time_id 预约时间Id
@@ -381,7 +381,7 @@ class ApiModel extends Model {
 	 }
 	 
 	 /**
-	 * 减产能
+	 * 减XX
 	 * @access public
 	 * @param int $capacity_id
 	 * @return mixed
@@ -581,7 +581,7 @@ class ApiModel extends Model {
 	}
 	
 	/**
-	 * 订单产能是否存在
+	 * 订单XX是否存在
 	 * @access public
 	 * @param  array $orderinfo	订单信息
 	 * @return boolean
