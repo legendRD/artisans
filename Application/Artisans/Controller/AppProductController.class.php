@@ -375,23 +375,23 @@ class AppProductController extends CommonController {
 	                  $hash['msg']    = 'noparam';
 	                  break;
 	            case 500:
-				$hash['status'] = 500;
-				$hash['msg'] = 'fail';
-				break;
-			case 200:
-			      $hash['status'] = 200;
-				$hash['msg'] = 'success';
-				$hash['data'] = $data;
-				break;
-			case 1008:
-				$hash['status'] = 1008;
-				$hash['msg'] = '存在订单，不能修改';
-				$hash['data'] = $data;
-				break;
+			  $hash['status'] = 500;
+			  $hash['msg'] = 'fail';
+			  break;
+		    case 200:
+			  $hash['status'] = 200;
+		       	  $hash['msg'] = 'success';
+			  $hash['data'] = $data;
+			  break;
+		    case 1008:
+			  $hash['status'] = 1008;
+			  $hash['msg'] = '存在订单，不能修改';
+			  $hash['data'] = $data;
+			  break;
 	      }
 	      $this->_echoInfo($hash,$_GET['parse']);	//显示信息
-		echo json_encode($hash);
-		exit();
+	      echo json_encode($hash);
+	      exit();
 	}
 	
 	private function _echoInfo($info, $parse='') {
@@ -430,6 +430,5 @@ class AppProductController extends CommonController {
 	public function getCompleteOrderInfo() {
 	      
 	}
-	
-	
+
 }
