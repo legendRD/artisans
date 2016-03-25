@@ -675,7 +675,29 @@ class AppProductController extends CommonController {
       
       //更改订单状态
       public function updateOrderState() {
-            
+            		$postData = I('request.');
+			$OrderId = $postData['order_id'];
+			if(!$OrderId){
+				$this->returnJsonData(300);
+			}
+			$data['ProcessId'] = 1;
+			$proName = M('prd_procedure')->where(array('ProcessId'=>'1'))->field('Name')->find();
+			$data['Name'] = $proName['Name'];
+			$order = M('ord_orderinfo')->where(array('OrderId'=>$OrderId))->field('CraftsmanId')->find();
+			$craftsman = M('crt_craftsmaninfo')->where(array('CraftsmanId'=>$order['CraftsmanId']))->field('Lat,Lng')->find();
+			$data['OrderId'] = $OrderId;
+			$data['CreaterTime'] = date("Y-m-d H:i:s");
+			$data['Lng'] = $craftsman['Lng'];
+			$data['Lat'] = $craftsman['Lat'];
+			M('ord_procedure_log')->add($data);
+			//回调调取XX接口
+			$param['order_id']	= $OrderId;
+			$param['status']	= 1;
+			$param['lng']		= $data['Lng'];
+			$param['lat']		= $data['Lat'];
+			$this->_callback_by($param);
+			
+			$this->returnJsonData(200);
       }
       
       /**
