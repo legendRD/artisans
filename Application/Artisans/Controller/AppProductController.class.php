@@ -332,7 +332,68 @@ class AppProductController extends CommonController {
       
       //保存设置
       public function setCapacity() {
-            
+            $data = file_put_contents("php://input");
+            $data = json_decode($data, true);
+            if(!$data) {
+            	$this->returnJsonData(300);
+            }
+            $arr = array();
+            $i = 0;
+            foreach($data['data'] as $Key=>$value) {
+            	if($value['data'] == date("Y-m-d")) {
+            		foreach($value['content'] as $ke => $val) {
+            			$str = (int)$val['time'] - (int)date('H', time());
+            			(int)time = substr($str, -2);
+            			if($val['time'] < date('H', time())) {
+            				$this->returnJsonData(1008);
+            			}elseif($time <= 3) {
+            				$this->returnJsonData(1008);
+            			}
+            		}
+            	}
+            	foreach($value['content'] as $k=>$v) {
+            		if($v['state'] == false) {
+            			if(!$v['capacity_id']) {
+            				$this->returnJsonData(300);
+            			}
+            			$arr[$i++] = $v['capcity_id'];
+            		}
+            	}
+            }
+            if($arr) {
+            	$where['CapacityId'] = array('in',$arr);
+		$where['IsDelete'] = 0;
+		$id = M('ord_orderinfo')->where($where)->field("OrderId")->select();
+		if($id) {
+			$this->returnJsonData(1008, $id);
+		}
+            }
+            unset($where);
+	    $arr = array();
+	    $i = 0;
+	    $j = 0;
+            foreach($data['data'] as $key=>$value) {
+            	foreach($value['content'] as $k=>$v) {
+            		if($v['state']==false) {
+            			$delWhere[$i++] = $v['capacity_id'];
+            		}else{
+            			$arr[$j]['TimeId'] = $v['time_id'];
+            			$arr[$j]['CreaterTime'] = date('Y-m-d H:i:s', time());
+            			$arr[$j]['CraftsmanId'] = $data['user_id'];
+            			$arr[$j]['MaxNum'] = 1;
+            			$arr[$j]['NouseNum'] = 1;
+            			$arr[$j++]['Capacity'] = $value['date'];
+            		}
+            	}
+            }
+            if($delWhere) {
+            	$where['CapacityId'] = array('in', $delWhere);
+            	$del = M('crt_capacity')->where($where)->delete();
+            }
+            if($arr) {
+            	$add = M('crt_capacity')->addAll($arr);
+            }
+            $this->returnJsonData(200);
       }
       
       //我的订单列表
