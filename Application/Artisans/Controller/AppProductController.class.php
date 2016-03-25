@@ -609,7 +609,68 @@ class AppProductController extends CommonController {
       
       //订单详情页
       public function orderShow() {
-            
+            		$postData = I('request.');
+			$OrderId = $postData['order_id'];
+			if(!$OrderId){
+				$this->returnJsonData(300);
+			}
+			$arr = array();
+			$where['OrderId'] = $OrderId;
+			$ordData = M('ord_orderinfo')->where($where)->field("RecycleTxt,OrderId,VmallOrderId,Address,Status,Name,ReservationTime,ProductRewardId,Phone,PayWay")->find();
+			unset($where);
+			$where['OrderId'] = $OrderId;
+			$prdData = M('ord_order_item')->where($where)->field('OrderId,ProductName,ProductId')->find();
+			unset($where);
+			$where['ProductId'] = $prdData['ProductId'];
+			$priceData = M('prd_productinfo')->where($where)->field('Profit')->find();
+			unset($where);
+			$where['ProductRewardId'] = $ordData['ProductRewardId'];
+			$rewardData = M('prd_reward')->where($where)->field('RewardId')->find();
+			unset($where);
+			$where['RewardId'] = $rewardData['RewardId'];
+			$rData = M('prd_reward')->where($where)->field('Price')->find();
+			$sumPrice = $priceData['Profit']+$rewardData['Price'];
+			$rewardData['Price'] = $rewardData['Price']?$rewardData['Price']:0;
+			$data['order_id'] = (int)$ordData['OrderId'];
+			$data['order_num'] = (string)$ordData['VmallOrderId'];
+			$data['type'] = (string)$prdData['ProductName'];
+			$data['price'] = (string)$sumPrice.'元(服务费：'.(string)$priceData['Profit'].'元+激励：'.(string)$rewardData['Price'].'元)';
+			$data['address'] = (string)$ordData['Address'];
+			$data['time'] = (string)$ordData['ReservationTime'];
+			$data['user'] = (string)$ordData['Name'];
+			$data['phone'] = (string)$ordData['Phone'];
+			$data['RecycleTxt']	= (string)$ordData['RecycleTxt'];
+			$proLogData = M('ord_procedure_log')->where(array('OrderId'=>$ordData['OrderId']))->select();
+			if($proLogData){
+				$data['state'] = 9;
+				$data['status'] = '待服务';
+				$data['yes'] = '现在出发';
+				$data['no'] = '更改订单';
+				if($ordData['PayWay'] == 1){
+					if($ordData['Status'] == 3){
+						$data['PayWay'] = '线下支付-已支付';
+					}else{
+						$data['PayWay'] = '线下支付-未支付(所收费用以短信为准)';
+					}
+				}else{
+					$data['PayWay'] = '线上支付-已支付';
+				}
+			}else{
+				$data['state'] = 3;
+				$data['status'] = '未确认';
+				$data['yes'] = '确认接单';
+				$data['no'] = '无法接单';
+				if($ordData['PayWay'] == 1){
+					if($ordData['Status'] == 3){
+						$data['PayWay'] = '线下支付-已支付';
+					}else{
+						$data['PayWay'] = '线下支付-未支付(所收费用以短信为准)';
+					}
+				}else{
+					$data['PayWay'] = '线上支付-已支付';
+				}
+			}
+			$this->returnJsonData(200,$data);
       }
       
       //更改订单状态
