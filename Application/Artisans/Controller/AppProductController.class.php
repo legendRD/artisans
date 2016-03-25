@@ -398,7 +398,163 @@ class AppProductController extends CommonController {
       
       //我的订单列表
       public function orderList() {
-            
+            	$postData = I('request.');
+		$CraftsmanId = $postData['user_id'];
+		if(!$CraftsmanId){
+			$this->returnJsonData(300);
+		}
+		$where['IsDelete'] = 0;
+		$where['CraftsmanId'] = $CraftsmanId;
+		$where['_string'] = "Status = 3 or (Status = 0 and PayWay = 1)";
+		$ordData = M('ord_orderinfo')->order('ReservationTime desc')->where($where)->field("OrderId,ReservationTime,Address,Status,PayWay")->select();
+		unset($where);
+		foreach($ordData as $value){
+			$order_id_s .= $value['OrderId'].',';
+		}
+		$order_id_s = trim($order_id_s, ',');
+		if($order_id_s) {
+			$proLogData = M('ord_procedure_log')->where('OrderId in('.$order_id_s.')')->select();
+			$prdData    = M('ord_order_item')->where('OrderId in ('.$oder_id_s.')')->field('OrderId, ProductName')->select();
+		}
+		$proData = M('prd_procedure')->select();
+		$data = array();
+		$orderIdWhere = array();
+		$o = 0;
+		foreach($ordData as $key => $value) {
+			$log = array();
+			$j = 0;
+			foreach($proLogData as $k => $v) {
+				if($value['OrderId'] == $v['OrderId']) {
+					$log[$j]['OrderId'] = $v['OrderId'];
+					$log[$j++]['ProcessId'] = $v['ProcessId'];
+				}
+			}
+			$data[$key]['statusDescription'] = '未确认';
+			$data[$key]['status'] = $value['Status'];
+			$data[$key]['sort'] = 2;
+			$proLog = array();
+			$f = 0;
+			foreach($prdData as $k => $v) {
+				if($value['OrderId'] == $v['OrderId']) {
+					$data[$key]['type'] 	= (string)$v['ProductName'];
+					$data[$key]['order_id'] = (int)$v['OrderId'];
+					$data[$key]['time'] 	= (string)$value['ReservationTime'];
+					$data[$key]['address']  = (string)$value['Address'];
+				}
+			}
+			if(!empty($log)) {
+				foreach($proData as $prokey => $provalue) {
+					if($provalue['ProcessId'] == $logvalue['ProcessId']) {
+						$proLog[$f]['Orderid'] = $provalue['Orderid'];
+						$proLog[$f]['OrderId'] = $logvalue['OrderId'];
+						$proLog[$f++]['ProcessId'] = $provalue['ProcessId'];
+					}
+				}
+				if(count($proLog)>1) {
+					foreach($proLog as $k=>$v) {
+						$temp[] = $v['Orderid'];
+						array_multisort($temp, SORT_DESC, $proLog);
+					}
+					$temp = array();
+				}
+				if($proLog[0]['ProcessId'] == 1) {
+					$data[$key]['statusDescription'] = '待服务';
+					$data[$key]['state'] = 9;
+					$data[$key]['sort'] = 3;
+				}elseif($proLog[0]['ProcessId'] == 6) {
+					//已服务显示已完成
+					$orderIdWhere[$o++] = $proLog[0]['OrderId'];
+					unset($data[$key]);
+				}else{
+					$data[$Key]['statusDescription'] = '服务中';
+					$data[$Key]['state'] = 10;
+					$data[$key]['sort'] = 1;
+				}
+			}
+		}
+		if(count($data)>1) {
+			foreach($data as $key=>$val) {
+				$temp_arr[] = $val['sort'];
+				unset($data[$key]['sort']);
+			}
+			$temp_arr = array();
+			$nine = array();
+			$n = 0;
+			$three = array();
+			$t = 0;
+			$ten = array();
+			$te = 0;
+			foreach($data as $key=>$val) {
+				if($data[$key]['state'] == 9) {
+					$nine[$n]['state'] = 9;
+					$nine[$n]['statusDescription'] = '待服务';
+					$nine[$n]['type'] = (string)$data[$key]['type'];
+					$nine[$n]['order_id'] = (int)$data[$key]['order_id'];
+					$nine[$n]['time'] = (string)$data[$key]['time'];
+					$nine[$n++]['address'] = (string)$data[$key]['address'];
+				}elseif($data[$key]['state'] == 3 or $data[$key]['state'] == 0) {
+					$three[$t]['state'] = $data[$key]['state'];
+					$three[$t]['statusDescription'] = '未确认';
+					$three[$t]['type'] = (string)$data[$key]['type'];
+					$three[$t]['order_id'] = (int)$data[$key]['order_id'];
+					$three[$t]['time'] = (string)$data[$key]['time'];
+					$three[$t++]['address'] = (string)$data[$key]['address'];
+				}elseif($data[$key]['state'] == 10) {
+					$ten[$te]['state'] = 10;
+					$ten[$te]['statusDescription'] = '服务中';
+					$ten[$te]['type'] = (string)$data[$key]['type'];
+					$ten[$te]['order_id'] = (int)$data[$key]['order_id'];
+					$ten[$te]['time'] = (string)$data[$key]['time'];
+					$ten[$te++]['address'] = (string)$data[$key]['address'];
+				}
+			}
+			if(count($nine)>1){
+				foreach($nine as $key=>$val){
+				    $time[] = $val['time'];
+				    array_multisort($time,SORT_ASC,$nine);
+				}
+				$time = array();
+			}
+			if(count($three)>1){
+				foreach($three as $key=>$val){
+				    $time[] = $val['time'];
+				    array_multisort($time,SORT_ASC,$three);
+				}
+				$time = array();
+			}
+			if(count($ten)>1){
+				foreach($ten as $key=>$val){
+				    $time[] = $val['time'];
+				    array_multisort($time,SORT_ASC,$ten);
+				}
+				$time = array();
+			}
+			$unfinish = array_merge( $ten, $three, $nine);
+		}else{
+			$un = 0;
+			foreach($data as $key=>$value) {
+				$unfinish[$un]['state'] = $value['state'];
+				$unfinish[$un]['statusDescription'] = $value['statusDescription'];
+				$unfinish[$un]['type'] = $value['type'];
+				$unfinish[$un]['order_id'] = $value['order_id'];
+				$unfinish[$un]['time'] = $value['time'];
+				$unfinish[$un++]['address'] = $value['address'];
+				unset($data[$key]['sort']);
+			}
+		}
+		unset($where);
+		unset($map);
+		$where['Status'] = array('in',array('2','4','7','8'));
+		$where['IsDelete'] = 0;
+		$where['CraftsmanId'] = $CraftsmanId;
+		$map['_complex'] = $where;
+		if(!empty($orderIdWhere)) {
+			$map['OrderId'] = array('in',$orderIdWhere);
+			$map['_logic'] = 'or';
+		}
+		$ordData = M('ord_orderinfo')->order('ReservationTime desc')->where($map)->field("OrderId,ReservationTime,Address,Status")->select();
+		unset($where);
+		
       }
       
       //订单详情页
