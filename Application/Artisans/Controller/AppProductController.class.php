@@ -554,7 +554,57 @@ class AppProductController extends CommonController {
 		}
 		$ordData = M('ord_orderinfo')->order('ReservationTime desc')->where($map)->field("OrderId,ReservationTime,Address,Status")->select();
 		unset($where);
-		
+		$prdData = M('ord_order_item')->field('OrderId, ProductName')->select();
+		$evaluationData = M('prd_evaluation')->field('OrderId, StarNums')->select();
+		$arr = array();
+		$i = 0;
+		foreach($ordData as $key=>$value) {
+			if($value['Status'] == 2) {
+				$arr[$Key]['state'] = 2;
+				$arr[$key]['statusDescription'] = '取消订单';
+			}elseif($value['Status'] == 4 || $value['Status'] == 3 || $value['Status'] == 0) {
+				$arr[$key]['state'] = 4;
+				$arr[$key]['statusDescription'] = '未点评';
+			}elseif($value['Status'] == 7) {
+				$arr[$key]['state'] = 7;
+				foreach($evaluationData as $k=>$v) {
+					if($value['OrderId'] == $v['OrderId']) {
+						if($v['StarNums'] == 5 || $v['StarNums'] == 4) {
+							$arr[$key]['evaluate'] = 1;
+							$arr[$key]['statusDescription'] = '好评';
+						}elseif($v['StarNums'] == 2 || $v['StarNums'] == 1) {
+							$arr[$key]['evaluate'] = 3;
+							$arr[$key]['statusDescription'] = '差评';
+						}else{
+							$arr[$key]['evaluate'] = 2;
+							$arr[$key]['statusDescription'] = '中评';
+						}
+					}
+				}
+			}elseif($value['Status'] == 8) {
+				$arr[$key]['state'] = 8;
+				$arr[$key]['statusDescription'] = '差评';
+			}
+			foreach($prdData as $k=>$v) {
+				if($value['OrderId'] == $v['OrderId']) {
+					$arr[$key]['type'] = (string)$v['ProductName'];
+					$arr[$key]['order_id'] = (int)$v['OrderId'];
+					$arr[$key]['time'] = (string)$value['ReservationTime'];
+					$arr[$key]['address'] = (string)$value['Address'];
+				}	
+			}
+		}
+		if($unfinish) {
+			$order_list['unfinish'] = $unfinish;
+		}else{
+			$order_list['unfinish'] = array();
+		}
+		$order_list['finish'] = $arr;
+		if($order_list) {
+			$this->returnJsonData(200, $order_list);
+		}else{
+			$this->returnJsonData(200, array());
+		}
       }
       
       //订单详情页
