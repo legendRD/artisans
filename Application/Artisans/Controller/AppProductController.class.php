@@ -788,7 +788,33 @@ class AppProductController extends CommonController {
 	
 	//获取订单信息接口
 	public function getOrderInfo() {
-	      
+	      $postData    =  I('param.');
+	      if (isset($postData['OrderId'])) {
+	      		//查询的条件
+	      		$where['ord.OrderId']     =  $postData['OrderId'];
+			$where['dictionary.Type'] =  20;
+			// 查询的字段
+			$field[]     =  'ord.*';
+			$field[]     =  'dictionary.DisKey as StatusValue';
+			// 查询
+			$info  =   M('ord_orderinfo ord')
+				   ->join("left join sys_dictionary dictionary on ord.Status=dictionary.DisValue")
+			           ->join("left join ord_order_item item on ord.OrderId=item.OrderId")
+				   ->field($field)
+				   ->where($where)
+				   ->find();
+			if($info) {
+				$return['status']   =    200;
+				$return['return']   =    $info;
+			}else{
+				$return['status']   =    409;   
+				$return['msg']      =    '无订单数据';
+			}
+	      }else{
+	      		$return['status']   =    300;   
+			$return['msg']      =    '缺少参数';
+	      }
+	      json_return($return, $postData['test']);
 	}
 	
 	//打电话记录日志接口
