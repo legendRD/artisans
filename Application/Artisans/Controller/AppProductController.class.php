@@ -1149,7 +1149,168 @@ class AppProductController extends CommonController {
 	}
 	
 	public function getCompleteOrderInfo() {
-	      
-	}
+	      $postData  = I('param.');
+              $OrderId   = $postData['OrderId'];
+              if($OrderId) {
+              	         $where['OrderId'] = $OrderId;
+			 $ordData = M('ord_orderinfo')->where($where)->field("RecycleTxt,OrderId,VmallOrderId,Address,Status,Name,ReservationTime,ProductRewardId,Phone,PayWay")->find();
+			 $prdData = M('ord_order_item')->where($where)->field('OrderId,ProductName,ProductId')->find();
+			 unset($where);
+			 $where['ProductId'] = $prdData['ProductId'];
+			 $priceData = M('prd_productinfo')->where($where)->field('Profit')->find();
+			 unset($where);
+			 $where['ProductRewardId'] = $ordData['ProductRewardId'];
+			 $rewardData = M('prd_reward')->where($where)->field('RewardId')->find();
+			 unset($where);
+			 $sumPrice = $priceData['Profit']+$rewardData['Price'];
+			 $rewardData['Price'] = $rewardData['Price']?$rewardData['Price']:0;
+			 $data['order_id'] = (int)$ordData['OrderId'];
+			 $data['order_num'] = (string)$ordData['VmallOrderId'];
+			 $data['type'] = (string)$prdData['ProductName'];
+			 $data['price'] = (string)$sumPrice.'元(服务费：'.(string)$priceData['Profit'].'元+激励：'.(string)$rewardData['Price'].'元)';
+		         $data['address'] = (string)$ordData['Address'];
+			 $data['Phone'] =(string)$ordData['Phone'];
+			 $data['time'] = (string)$ordData['ReservationTime'];
+			 $data['user'] = (string)$ordData['Name'];
+			 $data['state'] = (int)$ordData['Status'];
+			 $data['PayWay']=(int)$ordData['PayWay'];
+			 $data['RecycleTxt']	= (string)$ordData['RecycleTxt'];
+			 $proLogData = (int) M('ord_procedure_log')->where(' ( `OrderId` = %d ) ',$ordData['OrderId'])->order('ProcessId Desc')->getField('ProcessId');
+			 
+			 	if($ordData['Status'] == 3 && $ordData['PayWay']==1){
+					$data['status'] = '未确认';
+					$data['PayWay'] = '线下支付-已支付';
+					$data['yes'] = '确认接单';
+					$data['no'] = '无法接单';
+				}elseif ($ordData['Status'] == 3) {
+					$data['status'] = '未确认';
+					$data['PayWay'] = '线上支付-已支付';
+					$data['yes'] = '确认接单';
+					$data['no'] = '无法接单';
+					if ($proLogData==1) {
+						$data['state'] = 9;
+						$data['status'] = '待服务';
+						$data['yes'] = '现在出发';
+						$data['no'] = '更改订单';
+					}else if ($proLogData<6 && $proLogData>1) {
+						$data['state'] = 10;
+						$data['status'] = '服务中';
+					}
+				}elseif ($ordData['Status'] == 0 && $ordData['PayWay']==1) {
+					$data['status'] = '未支付';
+					$data['PayWay'] = '线下支付-未支付(所收费用以短信为准)';
+					$data['yes'] = '确认接单';
+					$data['no'] = '无法接单';
+					if ($proLogData==1) {
+						$data['state'] = 9;
+						$data['status'] = '待服务';
+						$data['yes'] = '现在出发';
+						$data['no'] = '更改订单';
+					}if ($proLogData<6 && $proLogData>1) {
+						$data['state'] = 10;
+						$data['status'] = '服务中';
+					}
+				}elseif ($ordData['Status'] == 0) {
+					$data['status'] = '未确认';
+					$data['PayWay'] = '线上支付-未支付(所收费用以短信为准)';
+					$data['yes'] = '确认接单';
+					$data['no'] = '无法接单';
+				}else if($ordData['Status'] == 4 && $ordData['PayWay']==1){
+					$data['PayWay'] = '线下支付-已支付';
+					$data['status'] = '未点评';
+				}else if($ordData['Status'] == 4 ){
+					$data['PayWay'] = '线上支付-已支付';
+					$data['status'] = '未点评';
+				}else if($ordData['Status'] == 7 && $ordData['PayWay']==1){
+					$data['PayWay'] = '线下支付-已支付';
+					$data['status'] = '已完成';
+				}else if($ordData['Status'] == 7){
+					$data['PayWay'] = '线上支付-已支付';
+					$data['status'] = '已完成';
+				}else if($ordData['Status'] == 2 && $ordData['PayWay']==1){
+					unset($orderInfo['PayWay']);
+					$data['status'] = '已取消';
+				}else if($ordData['Status'] == 2){
+					unset($orderInfo['PayWay']);
+					$data['status'] = '已取消';
+				}else if($ordData['Status'] == 8 && $ordData['PayWay']==1){
+					$data['PayWay'] = '线下支付-已支付';
+					$data['status'] = '差评';
+				}else if($ordData['Status'] == 8){
+					$data['PayWay'] = '线上支付-已支付';
+					$data['status'] = '差评';
+				}
+				
+				$return['status']=200;
+				$return['msg']='获取成功';
+				$return['OrderInfo']=array_filter($data,"fliter_null");
+				$ProcessInfo=M('ord_procedure_log')->where('( `OrderId`=%d )  AND ( `ProcessId` <> 1)',$OrderId)->select();
+				
+				if ($ProcessInfo) {
+					foreach ($ProcessInfo as $key => $value) {
+						$ProcessInfo[$key]['ProcessId']=$key+1;
+						
+						$ProcessInfo[$key]['IsPhoto']=0;
+						$ProcessInfo[$key]['CreaterTime'] = date('H:i',strtotime($value['CreaterTime']));
 
+						if ($value['ProcessId']==5) {
+							$ProcessInfo[$key]['IsPhoto']=1;
+							$ProcessInfo[$key]['Photo'] =M('ord_photoupload')->where('( `OrderId`=%d )',$OrderId)->select();
+							foreach ($ProcessInfo[$key]['Photo'] as $k => $v) {
+								$ProcessInfo[$key]['Photo'][$k]=C('TMPL_PARSE_STRING')['__IMG_URL__'].$v['PhotoUrl'];
+							}
+						}
+					}
+					if($ordData['Status'] == 0 && $ordData['PayWay']==1){
+						$return['OrderInfo']['status'] = '未点评';
+						$return['OrderInfo']['PayWay'] = '线下支付-已支付';
+						$return['OrderInfo']['state']=4;
+
+					}elseif($ordData['Status'] == 3 && $ordData['PayWay']==1){
+						$return['OrderInfo']['status'] = '未点评';
+						$return['OrderInfo']['PayWay'] = '线下支付-已支付';
+						$return['OrderInfo']['state']=4;
+
+					}elseif ($ordData['Status'] == 3) {
+						$return['OrderInfo']['state']=4;
+						$return['OrderInfo']['status'] = '未点评';
+						$return['OrderInfo']['PayWay'] = '线上支付-已支付';
+						$return['OrderInfo']['yes'] = '确认接单';
+						$return['OrderInfo']['no'] = '无法接单';
+						if ($proLogData==1) {
+							$return['OrderInfo']['state'] = 9;
+							$return['OrderInfo']['status'] = '待服务';
+							$return['OrderInfo']['yes'] = '现在出发';
+							$return['OrderInfo']['no'] = '更改订单';
+						}else if ($proLogData<6 && $proLogData>1) {
+							$return['OrderInfo']['state'] = 10;
+							$return['OrderInfo']['status'] = '服务中';
+						}
+					}
+					$return['ProcessInfo']=array_filter($ProcessInfo,"fliter_null");
+				}else{
+					$return['ProcessInfo']=array();
+				}
+				$Evaluation=M('prd_evaluation')->where('( `OrderId`=%d )',$OrderId)->field('HeadImgUrl,HeadImgCdnUrl,Comments,StarNums,CreaterTime')->find();
+				if ($Evaluation) {
+					if ($Evaluation['StarNums']==5 || $Evaluation['StarNums']==4) {
+						$Evaluation['Evaluation']='好评';
+					}else if($Evaluation['StarNums']==3 || $Evaluation['StarNums']==2){
+						$Evaluation['Evaluation']='中评';
+					}else{
+						$Evaluation['Evaluation']='差评';
+					}
+					
+					$return['EvaluationInfo']=array_filter($Evaluation,"fliter_null");
+				}else{
+					$return['EvaluationInfo']=(object)array();
+				}
+	      }else{
+	      		$return['status']=300;
+			$return['msg']='缺少参数';
+	      }
+	      json_return($return,$postData['test']);
+	}
+	
+	
 }
