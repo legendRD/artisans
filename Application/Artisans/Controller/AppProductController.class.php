@@ -1073,12 +1073,64 @@ class AppProductController extends CommonController {
 									M('ord_procedure_log')->add($log_data);
 									$this->_callback_by($param);
 									
+									$stepcount = M('cut_stepstate')->where(' ( `OrderId` = %d ) AND ( `CraftsmanId` = %d )',$where)->count();
 									
+									$steprd    = M('cut_stepstate')->where(' ( `OrderId` = %d ) AND ( `CraftsmanId` = %d )',$where)->find()['ProductId'];
+									$step      = M('prd_step')->where(array('ProductId'=>$steprd))->count();
+									
+									if ($stepcount == $step   &&  $stepcount != 0) {
+										//修改订单状态为已服务
+										M('ord_orderinfo')->where(' ( `OrderId` = %d ) AND ( `CraftsmanId` = %d )',$where)->save(array('Status'=>4,'UpdateTime'=>date("Y-m-d H:i:s")));
+										//记录日志
+										if ($ord['Status']==0) {
+											M('ord_update')->add(array('OrderId'=>$postData['OrderId'],'UpdateContent'=>'0|4','CreaterTime'=>date("Y-m-d H:i:s")));
+										}else{
+											M('ord_update')->add(array('OrderId'=>$postData['OrderId'],'UpdateContent'=>'3|4','CreaterTime'=>date("Y-m-d H:i:s")));
+										}
+									}
+									
+									$return['status'] = 200;
+									$return['msg']	  = '成功更新为【'.$process['Name'].'】';
+		      						}else{
+		      							$return['status'] = 500;
+		      							$return['msg']	  = $upload->getErrorMsg();
 		      						}
 		      					}else{
 		      						$return['status'] = 1004;
 								$return['msg']	  = '图片上传个数有误';
 		      					}
+		      				}else{
+		      							//没有数据记录, 图片上传记录
+		      							$process = M('prd_procedure')->where('ProcessId=5')->find();
+									$param['status']	= $log_data['ProcessId'] = $process['ProcessId'];
+									$log_data['Name']	= $process['Name'];
+									$param['order_id']	= $log_data['OrderId']   = $postData['OrderId'];
+									$log_data['CreaterTime']= date("Y-m-d H:i:s");
+									$param['lat']		= $log_data['Lat']	 = $postData['Lat'];
+									$param['lng']		= $log_data['Lng']	 = $postData['Lng'];
+									
+									// 更新流程数据
+									M('ord_procedure_log')->add($log_data);
+									$this->_callback_by($param);
+									
+									$stepcount = M('cut_stepstate')->where(' ( `OrderId` = %d ) AND ( `CraftsmanId` = %d )',$where)->count();
+									
+									$steprd    = M('cut_stepstate')->where(' ( `OrderId` = %d ) AND ( `CraftsmanId` = %d )',$where)->find()['ProductId'];
+									$step      = M('prd_step')->where(array('ProductId'=>$steprd))->count();
+									
+									if ($stepcount == $step   &&  $stepcount != 0) {
+										//修改订单状态为已服务
+										M('ord_orderinfo')->where(' ( `OrderId` = %d ) AND ( `CraftsmanId` = %d )',$where)->save(array('Status'=>4,'UpdateTime'=>date("Y-m-d H:i:s")));
+										//记录日志
+										if ($ord['Status']==0) {
+											M('ord_update')->add(array('OrderId'=>$postData['OrderId'],'UpdateContent'=>'0|4','CreaterTime'=>date("Y-m-d H:i:s")));
+										}else{
+											M('ord_update')->add(array('OrderId'=>$postData['OrderId'],'UpdateContent'=>'3|4','CreaterTime'=>date("Y-m-d H:i:s")));
+										}
+									}
+									
+									$return['status'] = 200;
+									$return['msg']	  = '成功更新为【'.$process['Name'].'】';		
 		      				}
 		      			}
 	      			}else{
