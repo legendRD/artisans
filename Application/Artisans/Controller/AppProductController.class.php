@@ -906,14 +906,194 @@ class AppProductController extends CommonController {
 	
 	/**
 	* 更新订单流程
-	* @access   public
-	* @param	string  OrderId       订单ID
+	* @access       public
+	* @param	string    OrderId       订单ID
 	* @param	int	  CraftsmanId   XXXid
-	* @param	float	  lng	          经度
+	* @param	float	  lng	        经度
 	* @param	float	  lat           纬度
 	*/
 	public function UdateOrderProcedure() {
-	      
+	      $postData  =   I('param.');
+	      $where[]=$postData['OrderId'];
+	      $where[]=$postData['CraftsmanId'];
+	      if (isset($postData['OrderId']) && isset($postData['CraftsmanId'])) {
+	      		$ord = M('ord_orderinfo')->where(' ( `OrderId` = %d ) AND ( `CraftsmanId` = %d )',$where)->find();
+	      		if($ord) {
+	      			if($ord['Status'] == 3 || $ord['Status'] == 0) {
+	      				//服务中, 已到达
+	      				$count = (int)M('ord_procedure_log')->where(' ( `OrderId` = %d ) ',$postData['OrderId'])->order('ProcessId Desc')->getField('ProcessId');
+	      				if($count==0) {
+	      					$return['status']=410;
+						$return['msg']='订单状态错误';
+	      				}
+	      				if ($count==1) {
+	      					$process = M('prd_procedure')->where('ProcessId=2')->find();
+	      					$param['status']         = $log_data['ProcessId']   = $process['ProcessId'];
+						$log_data['Name']        = $process['Name'];
+						$log_data['CreaterTime'] = date("Y-m-d H:i:s");
+						$param['order_id'] 	 = $log_data['OrderId']     = $postData['OrderId'];
+						$param['lat']		 = $log_data['Lat']	    = $postData['Lat'];
+						$param['lng']		 = $log_data['Lng']	    = $postData['Lng'];
+						// 更新流程数据
+						M('ord_procedure_log')->add($log_data);
+						$this->_callback_by($param);
+						
+						$return['status']=200;
+						$return['msg']='已更新为【'.$process['Name'].'】';
+	      				}
+	      				if($count==2) {
+	      					if($postData['Lat']==0 && $postData['Lat']==0) {
+	      						//没有数据记录, 更新为我已签到
+	      						$process = M('prd_procedure')->where('ProcessId=3')->find();
+	      						$param['status']  	 = $log_data['ProcessId'] = $process['ProcessId'];
+							$log_data['Name']        = $process['Name'];
+							$param['order_id']	 = $log_data['OrderId']   = $postData['OrderId'];
+							$log_data['CreaterTime'] = date("Y-m-d H:i:s");
+							$param['lat']		 = $log_data['Lat']       = $postData['Lat'];
+							$param['lng']		 = $log_data['Lng']       = $postData['Lng'];
+							// 更新流程数据
+							M('ord_procedure_log')->add($log_data);
+							$this->_callback_by($param);
+
+							$return['status']=200;
+							$return['msg']='已经强制更新为【'.$process['Name'].'】';
+	      					}else{
+		      					/*CREATE DEFINER=`用户名`@`%` FUNCTION `craft_get_distance`(lat1 DOUBLE,lng1 DOUBLE,lat2 DOUBLE,lng2 DOUBLE) RETURNS double
+							BEGIN
+							DECLARE distance DOUBLE DEFAULT 0;
+							DECLARE lat VARCHAR(20) DEFAULT '';
+							DECLARE lng VARCHAR(20) DEFAULT '';
+							DECLARE r DECIMAL(10,3);
+							SET r = 6378.137;
+							SET lat1 = (lat1*PI())/180;
+							SET lng1 = (lng1*PI())/180;
+							SET lat2 = (lat2*PI())/180;
+							SET lng2 = (lng2*PI())/180;
+							SET lat = lat2-lat1;
+							SET lng = lng2-lng1;
+							SET distance = 2*ASIN(SQRT(POW(SIN(lat/2),2)+COS(lat1)*COS(lat2)* POW(SIN(lng/2),2)));
+							SET distance = r*distance;
+							RETURN CONVERT(distance,DECIMAL(10,1));
+							END;*/
+							$field[] = "*";
+							$field[] = "craft_get_distance({$postData['Lat']}, {$postData['Lng']}, Lat, Lng) Distance";
+							$Distance = M('ord_orderinfo')
+							            ->where(' ( `OrderId` = %d ) ', $postData['OrderId'])
+							            ->field($field)
+							            ->find();
+							if($Distance['Distance']>1 && !$postData['ForceUpdate']) {
+								$return['status']=502;
+								$return['msg']='距离预约地点大于1公里,还差:'.$Distance['Distance'].'公里';
+							}else{
+								//没有数据记录，更新为我已签到
+								$process = M('prd_procedure')->where('ProcessId=3')->find();
+								$param['status']	 =  $log_data['ProcessId'] = $process['ProcessId'];
+								$log_data['Name']        =  $process['Name'];
+								$param['order_id']	 =  $log_data['OrderId']   = $postData['OrderId'];
+								$log_data['CreaterTime'] =  date("Y-m-d H:i:s");
+								$param['lat']		 =  $log_data['Lat']	  = $postData['Lat'];
+								$param['lng']		 =  $log_data['Lng']       = $postData['Lng'];
+								// 更新流程数据
+								M('ord_procedure_log')->add($log_data);
+								$this->_callback_by($param);
+	
+								$return['status']=200;
+								$return['msg']='成功更新为【'.$process['Name'].'】';
+							}
+	      					}
+		      			}
+		      			if($count == 3) {
+		      				//没有数据记录, 更新为开始服务
+		      				$process = M('prd_procedure')->where('ProcessId=4')->find();
+						$param['status']	 = $log_data['ProcessId'] = $process['ProcessId'];
+						$log_data['Name']	 = $process['Name'];
+						$param['order_id']	 = $log_data['OrderId']   = $postData['OrderId'];
+						$log_data['CreaterTime'] = date("Y-m-d H:i:s");
+						$param['lat']		 = $log_data['Lat']	  = $postData['Lat'];
+						$param['lng']		 = $log_data['Lng']	  = $postData['Lng'];
+						// 更新流程数据
+						M('ord_procedure_log')->add($log_data);
+						$this->_callback_by($param);
+
+						$return['status']=200;
+						$return['msg']='成功更新为【'.$process['Name'].'】';
+		      			}
+		      			if($count == 4) {
+		      				//交付关键点拍照
+		      				$itemInfo    = M('ord_order_item')->where(' ( `OrderId` = %d ) ',$postData['OrderId'])->find();
+		      				$ProductInfo = M('prd_productinfo')->find($itemInfo['ProductId']);
+		      				if($ProductInfo['IsPhoto'] == 1 && $_FILES['img']) {
+		      					$file = $_FILES['img'];
+		      					if($ProductInfo['PhotoNum'] >= count($file['name']) && count($file['name']) > 0) {
+		      						$img_root_path = C('UPLOAD_WX_IMG');
+		      						$save_path     = './artians/app/process/';
+		      						$config        = array(
+		      							'maxSize' =>2097152, //设置附件上传大小 2M
+									'rootPath'=>$img_root_path,
+									'savePath'=>$save_path,
+									'saveName'=>array('uniqid', ''),
+									'exts'	  =>array('jpg', 'gif', 'png', 'jpeg'),
+									'autoSub' =>true,
+									'subName' =>array('date', 'Ymd')
+		      						);
+		      						$upload = new \Think\Upload($config);	//实例化上传类
+		      						$info   = $upload->upload();
+		      						if($info) {
+		      							foreach($info as $val) {
+		      								$data['OrderId']     = $postData['OrderId'];
+		      								$data['PhotoUrl']    = C('VIEW_WX_IMG').trim($save_path, './').'/'.$val['savename'];
+		      								$data['PhotoUrlCdn'] = C('VIEW_WX_IMG').trim($save_path, './').'/'.$val['savename'];
+		      								$data['CreaterTime'] = date('Y-m-d H:i:s');
+		      								M('ord_photoupload')->add($data);
+		      							}
+		      							
+		      							//没有数据记录, 图片上传记录
+		      							$process = M('prd_procedure')->where('ProcessId=5')->find();
+									$param['status']	= $log_data['ProcessId'] = $process['ProcessId'];
+									$log_data['Name']	= $process['Name'];
+									$param['order_id']	= $log_data['OrderId']   = $postData['OrderId'];
+									$log_data['CreaterTime']= date("Y-m-d H:i:s");
+									$param['lat']		= $log_data['Lat']	 = $postData['Lat'];
+									$param['lng']		= $log_data['Lng']	 = $postData['Lng'];
+									
+									// 更新流程数据
+									M('ord_procedure_log')->add($log_data);
+									$this->_callback_by($param);
+									
+									//没有数据记录, 图片上传记录
+		      							$process = M('prd_procedure')->where('ProcessId=5')->find();
+									$param['status']	= $log_data['ProcessId'] = $process['ProcessId'];
+									$log_data['Name']	= $process['Name'];
+									$param['order_id']	= $log_data['OrderId']   = $postData['OrderId'];
+									$log_data['CreaterTime']= date("Y-m-d H:i:s");
+									$param['lat']		= $log_data['Lat']	 = $postData['Lat'];
+									$param['lng']		= $log_data['Lng']	 = $postData['Lng'];
+									
+									// 更新流程数据
+									M('ord_procedure_log')->add($log_data);
+									$this->_callback_by($param);
+									
+									
+		      						}
+		      					}else{
+		      						$return['status'] = 1004;
+								$return['msg']	  = '图片上传个数有误';
+		      					}
+		      				}
+		      			}
+	      			}else{
+					$return['status'] = 410;
+					$return['msg']    = '订单状态错误'.$ord['Status'];
+				}
+	      		}else{
+				$return['stauts'] = 501;
+				$return['msg']	  = '该订单不在服务中';
+			}
+	      }else{
+			$return['stauts']=300;
+			$return['msg']='缺少参数';
+	      }
+	      json_return($return,$postData['test']);
 	}
 	
 	public function getCompleteOrderInfo() {
