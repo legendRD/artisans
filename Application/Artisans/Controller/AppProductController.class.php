@@ -819,7 +819,22 @@ class AppProductController extends CommonController {
 	
 	//打电话记录日志接口
 	public function CallPhoneLog() {
-	      
+	      $postData=I('param.');
+	      if (isset($postData['CraftsmanId']) && isset($postData['OrderId']) && isset($postData['Phone'])) {
+	      	        $postData['CreaterTime'] = date("Y-m-d H:i:s");
+	      	        $status = M('cut_callphonelog')->add($postData);
+	      	        if($status) {
+	      	        	$return['status'] = 200;
+				$return['msg']    = 'success';
+	      	        }else{
+	      	        	$return['status'] = 500;
+				$return['msg']    = 'error';
+	      	        }
+	      }else{
+	      		$return['status'] = 300;
+			$return['msg']    = '缺少参数';
+	      }
+	      json_return($return,$postData['test']);
 	}
 	
 	//获取订单流程
