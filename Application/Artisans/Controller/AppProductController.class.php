@@ -839,7 +839,69 @@ class AppProductController extends CommonController {
 	
 	//获取订单流程
 	poublic function getOrderProcedure() {
-	      
+	      $postData   =   I('param.');
+	      if (isset($postData['OrderId'])) {
+	      		$count = (int)M('ord_procedure_log')->where(' ( `OrderId` = %d ) ',$postData['OrderId'])->order('ProcessId Desc')->getField('ProcessId');
+	      		$item  =      M('ord_order_item')->where(' ( `OrderId` = %d ) ',$postData['OrderId'])->find();
+	      		if ($count==2) {
+	      			$Process     =  M('prd_procedure')->where('( `ProcessId`=3 )')->select();
+				$orderInfo   =  M('ord_orderinfo')->where(' ( `OrderId` = %d ) ',$postData['OrderId'])->find();
+				$ProductInfo =  M('prd_productinfo')->find($item['ProductId']);
+				if ($orderInfo['PayWay'] == 1 && $orderInfo['Status'] == 0 ) {
+					$orderInfo['PayWay'] = '线下支付-未支付(所收费用以短信为准)';
+				}elseif ($orderInfo['PayWay'] == 1 && $orderInfo['Status'] == 3) {
+					$orderInfo['PayWay'] = '线下支付-已支付';
+				}elseif ($orderInfo['Status'] == 3) {
+					$orderInfo['PayWay'] = '线上支付-已支付';
+				}elseif ($orderInfo['Status'] == 0) {
+					$orderInfo['PayWay'] = '线上支付-未支付(所收费用以短信为准)';
+				}
+				$return['status'] 	= 200;
+				$return['msg']	  	= 'success';
+				$return['name']   	= $item['ProductName'];
+				$return['ProcessInfo']  = $Process;
+				$return['orderInfo']    = $orderInfo;
+				$return['IsPhoto']      = $ProductInfo['IsPhoto'];
+				$return['PhotoNum']     = $ProductInfo['PhotoNum'];
+	      		}elseif($count==3) {
+	      			$Process     = M('prd_procedure')->where('( `ProcessId`=4 )')->select();
+				$orderInfo   = M('ord_orderinfo')->where(' ( `OrderId` = %d ) ',$postData['OrderId'])->find();
+				$ProductInfo = M('prd_productinfo')->find($item['ProductId']);
+	      			if ($orderInfo['PayWay'] == 1 && $orderInfo['Status'] == 0 ) {
+					$orderInfo['PayWay'] = '线下支付-未支付(所收费用以短信为准)';
+				}elseif ($orderInfo['PayWay'] == 1 && $orderInfo['Status'] == 3) {
+					$orderInfo['PayWay'] = '线下支付-已支付';
+				}elseif ($orderInfo['Status'] == 3) {
+					$orderInfo['PayWay'] = '线上支付-已支付';
+				}elseif ($orderInfo['Status'] == 0) {
+					$orderInfo['PayWay'] = '线上支付-未支付(所收费用以短信为准)';
+				}
+				$return['status']      = 200;
+				$return['msg']         = 'success';
+				$return['name']        = $item['ProductName'];
+				$return['ProcessInfo'] = $Process;
+				$return['orderInfo']   = $orderInfo;
+				$return['IsPhoto']     = $ProductInfo['IsPhoto'];
+				$return['PhotoNum']    = $ProductInfo['PhotoNum'];
+	      		}elseif($count==4) {
+	      			$Process     = M('prd_procedure')->where('( `ProcessId`=5 )')->select();
+				$orderInfo   = M('ord_orderinfo')->where(' ( `OrderId` = %d ) ',$postData['OrderId'])->find();
+				$ProductInfo = M('prd_productinfo')->find($item['ProductId']);
+				$return['status']	=200;
+				$return['msg']		='success';
+				$return['name']		=$item['ProductName'];
+				$return['ProcessInfo']  =$Process;
+				$return['IsPhoto']	=$ProductInfo['IsPhoto'];
+				$return['PhotoNum']	=$ProductInfo['PhotoNum'];
+	      		}else{
+	      			$return['status']=410;
+				$return['msg']='流程状态错误';
+	      		}
+	      }else{
+	      		$return['status'] = 300;
+			$return['msg']    = '缺少参数';
+	      }
+	      json_return($return,$postData['test']);
 	}
 	
 	/**
