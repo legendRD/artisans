@@ -709,12 +709,48 @@ class AppProductController extends CommonController {
 	* @param	float	lat      纬度
 	*/
 	private function _callback_by($param) {
-	      
+	      $order_id		= $param['order_id'];
+	      $status		= $param['status'];
+	      $lng		= $param['lng'];
+              $lat		= $param['lat'];
+              $log_url 		= '/opt/www_logs/'.C('TP_PROJECT_APP').'/api/'.'by_api_'.date('Ymd').'.log';
+              wlog($log_url, $param);
+              
+              //回调调取XX接口
+              $model = new \Artisans\Org\Scrypt($this->_scrypt_pwd);
+              $param = array(
+              		'id'=>$order_id,
+			'status'=>$status,
+			'gps'=>$lng.','.$lat
+              );
+              $params 	 = http_build_query($params);
+              $en_string = $model->encrypt_base64($params);
+              $url	 = $this->_callback_by_url.'?v='.urlencode($en_string);
+              $data 	 = send_get_curl($url);
+              wlog($log_url, $data);
 	}
 	
 	//传送客户端手机号
 	public function getPhone() {
-	      
+	        $postData = I('request.');
+        	$where['IsDelete'] = 0;
+		$phone = M('sys_phone')->where($where)->field('Phone,PhoneType')->select();
+		$data['unable'] = '';
+		$data['modify'] = '';
+		$data['help'] = '';
+		$data['phone'] = '';
+		foreach($phone as $value) {
+			if($value['PhoneType'] == 0) {
+				$data['unable'] = $value['Phone'];
+			}elseif($value['PhoneType'] == 1) {
+				$data['modify'] = $value['Phone'];
+			}elseif($value['PhoneType'] == 2) {
+				$data['help'] = $value['Phone'];
+			}elseif($value['PhoneType'] == 3) {
+				$data['phone'] = $value['Phone'];
+			}
+		}
+		$this->returnJsonData(200, $data);
 	}
 	
 	//返回数据
