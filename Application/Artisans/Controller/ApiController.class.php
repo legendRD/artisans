@@ -492,7 +492,39 @@ class ApiController extends CommonController {
     	// 产品Id
     	// 分页  page limit
     	public function getEvaluationList($param = null) {
-    	  
+    	  	if(isset($param)) {
+		         $postData = $param;
+		}else{
+		         $postData = I('param.');
+		}
+		
+		if(isset($postData['CraftsmanId']) || isset($postData['ProductId'])) {
+			if(isset($postData['CraftsmanId'])) {
+				$where['CraftsmanId']   =   $postData['CraftsmanId'];
+			}
+			if(isset($postData['ProductId']))   {
+				$where['ProductId']     =   $postData['ProductId'];
+			}
+			
+			$field[]='NickName as name';
+			$field[]='StarNums as nums';
+			$field[]='Comments as comments';
+			$field[]='HeadImgUrl as headImg';
+			$field[]='HeadImgCdnUrl as cdn_headImg';
+			$field[]='CreaterTime as time';
+			$field[]='UserId as userId';
+			
+			if(isset($postData['page']) && isset($postData['limit'])) {
+				$return['count'] = M('prd_evalution')->where($where)->count();
+				$data = M('prd_evaluation')->where($where)->field($field)->page($postData)
+			}
+		}
+		
+		if(isset($param)) {
+		         return $return;
+		}else{
+		         json_return($return, $postData['test']);
+		}
     	}
     	
     	//获取产品关键步骤
