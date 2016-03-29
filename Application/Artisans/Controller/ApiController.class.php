@@ -65,8 +65,58 @@ class ApiController extends CommonController {
              	      			->page($postData['page'], $postData['limit'])
              	      			->select();
              	      }else{
-             	      	
+             	      		$data = M('prd_product_platform_city')
+             	      			->join('left join prd_productinfo prd on prd.ProductId = rela.ProductId')
+             	      			->where($where)
+             	      			->order($order)
+             	      			->field($field)
+             	      			->page($postData['page'], $postData['limit'])
+             	      			->select();	
              	      }
+             	      if($data) {
+             	      		foreach($data as $k = > $v) {
+             	      			$attribute = M('prd_attribute')
+             	      				     ->where(array('RelationshipId'=>$v['RelationshipId']))
+             	      				     ->select();
+             	      			foreach($attribute as $v1) {
+             	      				$attributeName = $v1['Attribute'];
+             	      				$AttributeValue = $v1['Value'];
+             	      				$data[$k][$attributeName] = $AttributeValue;
+             	      			}
+             	      			foreach($data as $k=>$v) {
+             	      				// 活动的查询的条件
+             	      				$where_pro['ProductId'] = $v['ProductId'];
+             	      				$where_pro['StartTime'] = array('lt', date("Y-m-d H:i:s"));
+             	      				$where_pro['EndTime']   = array('gt', date("Y-m-d H:i:s"));
+             	      				$where_pro['IsDelete']  = 0;
+             	      				$where_pro['IsUse']	= 1;
+             	      				// 活动表筛选的字段
+						$field_pro[]  =  'PromotionID';
+						$field_pro[]  =  'ActivityPrice as endPrice';
+						$field_pro[]  =  'Discount as discount';
+						$field_pro[]  =  'StartTime as startTime';
+						$field_pro[]  =  'EndTime as endTime';
+						
+						$promotion    =   M('prd_promotion')->where($where_pro)->field($field_pro)->find();
+						if($promotion) {
+							$promotion['endPrice'] = (int)$promotion['endPrice'];
+						}
+						$data[$k]['promotion'] = $promotion;
+             	      			}
+             	      			$return['status']  =  200;
+					$return['msg']   =  'success';
+					$return['data']  =  $data;
+             	      		}
+             	      }
+             }else{
+             	      	$return['status']  =  300;
+			$return['msg']  =  '参数错误';
+             }
+             
+             if(isset($param)) {
+             	      	return $return;
+             }else{
+             	      	json_return($return, $postData['test']);
              }
       }
       
