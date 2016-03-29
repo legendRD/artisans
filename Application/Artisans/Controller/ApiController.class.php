@@ -448,7 +448,43 @@ class ApiController extends CommonController {
       // XXXId    CraftsmanId
 	    // 经纬度 lat lng
       public function getCraftsManInfo($param = null) {
-        
+             if(isset($param)) {
+	             	$postData = $param;
+	     }else{
+	             	$postData = I('param.');
+	     }
+	     
+	     if(isset($postData['CraftsmanId'])) {
+	     		$where['CraftsmanId'] = $postData['CraftsmanId'];
+	     		if(isset($postData['lng']) && isset($post['lat'])) {
+	     			$field[] = "craft_get_distance({$postData['lat']}, {$postData['lng']}, Lat, Lng) as Distance";
+	     		}
+	     		$field[]   =    'CraftsmanId';
+			$field[]   =    'TrueName as trueName';
+			$field[]   =    'HeadImgUrl as headImg';
+			$field[]   =    'HeadImgCdnUrl as cdn_headImg';
+			$field[]   =    'Source as source';
+			$field[]   =    'Title as title';
+			$field[]   =    'Address as address';
+			$field[]   =    'GoodRate as goodRate';
+			$field[]   =    'ServiceNum as serviceNum';
+			$field[]   =    'Description as description';
+			
+			$data      =    M('crt_craftsmaninfo')->where($where)->field($field)->find();
+			
+			$list 	   =   $this->getArtisansProductList($where);
+			$data['productInfo'] =   $list['data'];
+			
+			$return['status']    =  200;
+			$return['msg']       =  'success'; 
+			$return['data']      =  $data;
+	     }
+	     
+	     if(isset($param)) {
+	        	return $return;
+	     }else{
+	        	json_return($return, $postData['test']);
+	     }
       }
       
       //获取XXX的评价信息
