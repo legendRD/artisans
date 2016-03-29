@@ -13,7 +13,61 @@ class ApiController extends CommonController {
 		// 当前页                  page
 		// 每页显示多少条产品      limit
       public function getProductList($param = null) {
-
+             if(isset($param)) {
+             	$postData = $param;
+             }else{
+             	$postData = I('param.');
+             }
+             
+             $where['rela.PlatformId'] = $postData['PlatformId'];
+             $where['rela.CityId']     = array('in', array('0', $postData['CityId']));
+             
+             if(isset($postData['CityId']) && isset($postData['PlatformId'])) {
+             	      //分类的筛选条件
+             	      if(isset($postData['ClassType'])) {
+             	      		$where['rela.ClassType'] = $postData['ClassType'];
+             	      }
+             	      if(isset($postData['Sorting']) && $postData['Sorting'] == 2) {
+             	      		$order['rela.Sorting'] = 'desc';
+             	      }else{
+             	      		$order['rela.Sorting'] = 'asc';
+             	      }
+             	      
+             	      $field[] = 'rela.RelationshipId';
+             	      $field[] = 'prd.ProductId';
+             	      $field[] = 'prd.ProductName as name';
+             	      $field[] = 'prd.ProductTitle as title';
+             	      $field[] = 'prd.AddressInfo as addressInfo';
+             	      $field[] = 'prd.LogoImgUrl as classImg';
+             	      $field[] = 'prd.LogoImgCdnUrl as classImg_cdn';
+             	      $field[] = 'prd.DetailImgUrl as headImg';
+             	      $field[] = 'prd.DetailImgCdnUrl as headImg_cdn';
+             	      $field[] = 'prd.ProductType as prdtype';
+             	      $field[] = 'prd.Reservel as position';
+             	      $field[] = 'prd.Price as proPrice';
+             	      $field[] = 'prd.Reserve2 as colorClass';
+             	      
+             	      $where['prd.IsShelves'] = is_numeric($postData['IsShelves']) ? $postData['IsShelves']:1;
+             	      $where['prd.IsDelete']  = 0;
+             	      
+             	      if(isset($postData['limit']) && isset($postData['page'])) {
+             	      		$return['count'] = M('prd_product_platform_city as rela')
+             	      				   ->join('left join prd_productinfo prd on prd.ProductId = rela.ProductId')
+             	      				   ->where($where)
+             	      				   ->order($order)
+             	      				   ->count();
+             	      		
+             	      		$data = M('prd_product_platform_city')
+             	      			->join('left join prd_productinfo prd on prd.ProductId = rela.ProductId')
+             	      			->where($where)
+             	      			->order($order)
+             	      			->field($field)
+             	      			->page($postData['page'], $postData['limit'])
+             	      			->select();
+             	      }else{
+             	      	
+             	      }
+             }
       }
       
    // 获取产品详情的接口 
@@ -64,7 +118,7 @@ class ApiController extends CommonController {
     	  
     	}
     	
-    	//获取XX
+    	// 获取XX接口
     	// 产品Id    ProductId
     	// 城市Id    CityId
     	// 日期      Date
@@ -79,8 +133,8 @@ class ApiController extends CommonController {
     	  
     	}
     	
-    	//发送验证码接口
-    	// 电话号 phone
+    	    //发送验证码接口
+    	    // 电话号 phone
 	    // 平台来源 type
 	    public function SendCode($param = null) {
 	      
@@ -88,7 +142,7 @@ class ApiController extends CommonController {
 	    
 	    //验证验证码接口
 	    // 电话号 phone
-      // 验证码 code
+      	    // 验证码 code
 	    public function CheckCode($param = null) {
 	      
 	    }
@@ -101,7 +155,6 @@ class ApiController extends CommonController {
 	    public function api() {
 	           C('TMPL_L_DELIM', '<{');
 	           C('TMPL_R_DELIM', '>}');
-	           
 	           $this->display('api');
 	    }
 	    
