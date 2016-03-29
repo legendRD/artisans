@@ -445,14 +445,14 @@ class ApiController extends CommonController {
       }
       
       //获取XXX的详细信息接口
-      // 手艺人Id    CraftsmanId
+      // XXXId    CraftsmanId
 	    // 经纬度 lat lng
       public function getCraftsManInfo($param = null) {
         
       }
       
       //获取XXX的评价信息
-      // 手艺人Id
+      // XXXId
     	// 产品Id
     	// 分页  page limit
     	public function getEvaluationList($param = null) {
