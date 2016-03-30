@@ -606,6 +606,7 @@ class ApiController extends CommonController {
     	  			->order('time')
     	  			->where('times.IsDelete=0')
     	  			->select();
+    	  		
     	  		foreach($data as $ks => $vs) {
     	  			$where['cap.TimeId'] = $vs['time_id'];
     	  			$info = M('crt_capacity as cap')
@@ -616,6 +617,35 @@ class ApiController extends CommonController {
     	  				->select();
     	  			$data[$ks]['nouseNum'] = $info[0]['nouseNum'];
     	  		}
+    	  		
+    	  		$unix = time();
+    	  		$date = date("Y-m-d", $unix);
+    	  		if($date == $postData['Date']) {
+    	  			$Hour[] = date('H:00', $unix);
+    	  			$Hour[] = date('H:00', $unix+3600);
+    	  			$Hour[] = date('H:00', $unix+7200);
+    	  			$Hour[] = date('H:00', $unix+10800);
+    	  		}
+    	  		
+    	  		foreach($data as $key => $value) {
+    	  			if($value['nouseNum'] > 0) {
+    	  				$data[$key]['state']=true;
+    	  			}else{
+    	  				$data[$key]['state']=false;
+    	  			}
+    	  		}
+    	  		
+    	  		if($Hour) {
+    	  			if($Hour[0] > $value['time']) {
+    	  				$data[$key]['state'] = false;
+    	  			}
+    	  			foreach($Hour as $k => $v) {
+    	  				if($v == $value['time']) {
+    	  					$data[$key]['state'] = false;
+    	  				}
+    	  			}
+    	  		}
+    	  		
     	  		$return['status']   =  200  ;
 			$return['msg']      =  'success';
 			$return['data']     =  $data;	
@@ -633,7 +663,7 @@ class ApiController extends CommonController {
     	
     	// 更新订单状态接口
     	public function updateOrderStatus($param = null) {
-    	  
+    	       
     	}
     	
     	    //发送验证码接口
