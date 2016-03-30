@@ -848,6 +848,39 @@ class ApiController extends CommonController {
 	    
 	    //获取XXX基本信息接口
 	    public function getcraftinfo() {
+	           $param = I('post.');
+	           $phone = trim($param['phone']);
+	           $data = array();
 	           
+	           if($phone) {
+	           	$userinfo = M('crt_craftsmaninfo as cc')
+	           		    ->join('left join sys_city as sc on cc.City=sc.CityId')
+	           		    ->where(" Phone='%s' ", $phone)
+	           		    ->find();
+	                
+	                $data['craft_id']	= $userinfo['CraftsmanId'];
+	    		$data['username']	= $userinfo['UserName'];
+	    		$data['name']		= $userinfo['TrueName'];
+	    		$data['openid']		= $userinfo['Openid'];
+	    		$data['img']		= '';
+	    		$data['description']	= $userinfo['Description'];
+	    		$data['lat']		= $userinfo['Lat'];
+	    		$data['lng']		= $userinfo['Lng'];
+	    		$data['goodrate']	= $userinfo['GoodRate'];
+	    		$data['email']		= $userinfo['Email'];
+	    		$data['phone']		= $userinfo['Phone'];
+	    		$data['address']	= $userinfo['Address'];
+	    		$data['cityid']		= $userinfo['City'];
+	    		$data['cityname']	= $userinfo['CityName'];
+	    		$data['is_check']	= $userinfo['IsCheck'];  //是否审核通过，0审核通过，1未审核
+	    		$data['state']		= $userinfo['State'];    //XXX状态0，在岗1，离岗2，离职
+	    		if($userinfo['HeadImgCdnUrl']) {
+	    			$data['img']	= $_SERVER['HTTP_HOST'].$userinfo['HeadImgCdnUrl'];
+	    		}elseif($userinfo['HeadImgUrl']) {
+	    			$data['img']	= $_SERVER['HTTP_HOST'].$userinfo['HeadImgUrl'];
+	    		}
+	           }
+	           
+	           return json_encode(array('status'=>200,'msg'=>'success','data'=>$data));
 	    }
 }
