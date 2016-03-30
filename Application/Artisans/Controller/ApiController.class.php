@@ -663,14 +663,39 @@ class ApiController extends CommonController {
     	
     	// 更新订单状态接口
     	public function updateOrderStatus($param = null) {
-    	       
+    	       if(isset($post_data)) {
+    	  		$param = $post_data;
+    	  		$exit_type = 'array';
+    	  	}else{
+    	  		$param = I('request.');
+    	  		$exit_type = 'json';
+    	  	}
+    	  	
+    	  	$data['OrderId'] = $postData['id'];
+    	  	$res = M('ord_orderinfo')->where('OrderId = %d AND (Status=4 or Status=3 or Status=0)', $data['OrderId'])->find();
+    	  	if($res) {
+    	  		M('ord_orderinfo')->where('OrderId = %d AND (Status=4 or Status=3 or Status=0)', $data['OrderId'])->save(array('Status'=>$postData['ss'], 'UpdateTime'=>date('Y-m-d H:i:s')));
+    	  		//记录日志
+    	  		M('ord_update')->add(array('OrderId'=>$postData['OrderId'],'UpdateContent'=>'4|'.$postData['id'],'CreaterTime'=>date("Y-m-d H:i:s")));
+    	  		
+    	  		$return['status']=200;
+			$return['msg']='success';
+    	  	}else{
+    	  		$return['status']=300;
+			$return['msg']='订单状态不符合';
+    	  	}
+    	  	if($param) {
+    	  		return $return;
+    	  	}else{
+    	  		json_return($return, $postData['test']);
+    	  	}
     	}
     	
     	    //发送验证码接口
     	    // 电话号 phone
 	    // 平台来源 type
 	    public function SendCode($param = null) {
-	      
+	      	   
 	    }
 	    
 	    //验证验证码接口
