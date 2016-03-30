@@ -795,7 +795,43 @@ class ApiController extends CommonController {
 		         $postData = I('param.');
 		   }
 		   
-		   
+		   if(isset($postData['recordid']) && isset($postData['score'])) {
+		   	$where['recordid']=$postData['recordid'];
+    			$data=M('ord_record')->where($where)->find();
+    			if($data) {
+    				$addData['OrderId']=$data['caseid'];
+	    			$addData['NickName']=$data['nick_name'];
+	    			$addData['UserId'] = M('cut_uid_thirdname')->where(" ThirdName='%s' ",$data['openid'])->getField('UserId');
+	    			$addData['HeadImgUrl'] = '/img/valuation/atator/'.$data['openid'].'.jpg';
+	    			$addData['HeadImgCdnUrl'] = '/img/valuation/atator/'.$data['openid'].'.jpg';
+	    			$addData['CraftsmanId'] =  M('crt_craftsmaninfo')->where(" UserName='%s' ",$data['username'])->getField('CraftsmanId');
+	    			$addData['StarNums']=$postData['score'];
+	    			$addData['CreaterTime']=date("Y-m-d H:i:s");
+	    			$addData['Source']=0;
+	    			$addData['Comments']=$postData['content'];
+	    			$addData['ProductId']=M('ord_order_item')->where(array('OrderId'=>$data['caseid']))->getField('ProductId');
+	    			
+	    			$add=M('prd_evaluation')->add($addData);
+	    			if($add) {
+	    				M('ord_orderinfo')->where('OrderId = %d AND (Status=4  or Status=3 or Status=0)',$addData['OrderId'])->save(array('Status'=>7,'UpdateTime'=>date("Y-m-d H:i:s")));
+					// 记录日志
+					M('ord_update')->add(array('OrderId'=>$addData['OrderId'],'UpdateContent'=>'7','CreaterTime'=>date("Y-m-d H:i:s")));
+					
+					$return['status']=200;
+    					$return['msg']='success';
+	    			}else{
+	    				$return['status']=500;
+	    				$return['msg']='失败';
+	    				$return['data']=$addData;
+	    			}
+    			}else{
+    				$return['status']=500;
+    				$return['msg']='失败';
+    			}
+		   }else{
+		   	$return['status']=300;
+    			$return['msg']='缺少参数';
+		   }
 		   
 		   if($param) {
 	    	   	return $return;
@@ -812,6 +848,6 @@ class ApiController extends CommonController {
 	    
 	    //获取XXX基本信息接口
 	    public function getcraftinfo() {
-	      
+	           
 	    }
 }
