@@ -789,7 +789,19 @@ class ApiController extends CommonController {
 	    
 	    //保存评价接口
 	    public function SaveEvaluation($param = null) {
-	      
+	           if(isset($param)) {
+		         $postData = $param;
+		   }else{
+		         $postData = I('param.');
+		   }
+		   
+		   
+		   
+		   if($param) {
+	    	   	return $return;
+	    	   }else{
+	    	   	json_return($return, $postData['test']);
+	    	   }
 	    }
 	    
 	    public function api() {
