@@ -529,7 +529,46 @@ class ApiController extends CommonController {
     	
     	//获取产品关键步骤
     	public function getProductStep($post_data = null) {
-    	  
+    	  	if(isset($post_data)) {
+    	  		$param = $post_data;
+    	  		$exit_type = 'array';
+    	  	}else{
+    	  		$param = I('request.');
+    	  		$exit_type = 'json';
+    	  	}
+    	  	
+    	  	$pro_id   = $param['pro_id'];
+    	  	$order_id = $param['order_id'];
+    	  	
+    	  	//产品步骤
+    	  	if($pro_id) {
+    	  		$step_info = M('prd_step')
+    	  			     ->where("ProductId = %d and IsDelete = 0", $pro_id)
+    	  			     ->field("StepId step_id, Description description")
+    	  			     ->select();
+    	  	}
+    	  	
+    	  	//订单步骤
+    	  	if($order_id) {
+    	  		$order_step_info = M('cut_stepstate')
+    	  				   ->where("OrderId = %d", $order_id)
+    	  				   ->order("StepId asc")
+    	  				   ->select();
+    	  	}
+    	  	if(empty($order_step_info)) {
+    	  		$order_step_info = array();
+    	  	}
+    	  	
+    	  	$data = array(
+    	  		'pro_step'=>$step_info,
+    	  		'order_step'=>$order_step_info
+    	  	);
+    	  	
+    	  	if($exit_type == 'json') {
+    	  		json_return(array('status'=>200, 'msg'=>'success', 'data'=>$data));
+    	  	}else{
+    	  		return array('status'=>200, 'msg'=>'success', 'data'=>$data);
+    	  	}
     	}
     	
     	// 获取XX接口
@@ -539,7 +578,57 @@ class ApiController extends CommonController {
     
     	// 可传参数  CraftsmanId
     	public function capacityByCityProIdDate($param = null) {
-    	  
+    	  	if(isset($post_data)) {
+    	  		$param = $post_data;
+    	  		$exit_type = 'array';
+    	  	}else{
+    	  		$param = I('request.');
+    	  		$exit_type = 'json';
+    	  	}
+    	  	
+    	  	if(isset($postData['ProductId']) && (isset($postData['CityId']) || isset($postData['CraftsmanId'])) && isset($postData['Date'])) {
+    	  		$where['crt.State']       =  isset($postData['State'])   ?$postData['State']   :0;
+			$where['crt.IsCheck']     =  isset($postData['IsCheck']) ?$postData['IsCheck'] :0;
+			$where['crt.IsDelete']    =  isset($postData['IsDelete'])?$postData['IsDelete']:0;
+    	  		$where['cap.Capacity']    =  $postData['Date'];
+    	  		if(isset($postData['CraftsmanId'])) {
+    	  			$where['crt.CraftsmanId'] = $postData['CraftsmanId'];
+    	  		}else{
+    	  			$where['crt.City'] = $postData['CityId'];
+    	  		}
+    	  		$where['prd.ProductId'] = $postData['ProductId'];
+    	  		$where['prd.State'] =  1;
+    	  		
+    	  		$field[]   =    'sum(cap.NouseNum) as nouseNum';
+    	  		
+    	  		$data = M('prd_servicetime as times')
+    	  			->field('times.StartTime as time,times.TimeId as time_id')
+    	  			->order('time')
+    	  			->where('times.IsDelete=0')
+    	  			->select();
+    	  		foreach($data as $ks => $vs) {
+    	  			$where['cap.TimeId'] = $vs['time_id'];
+    	  			$info = M('crt_capacity as cap')
+    	  				->join("right join crt_craftsmaninfo crt on crt.CraftsmanId=cap.CraftsmanId")
+    	  				->join("right join prd_product_craftsman prd on cap.CraftsmanId=prd.CraftsmanId")
+    	  				->where($where)
+    	  				->field($field)
+    	  				->select();
+    	  			$data[$ks]['nouseNum'] = $info[0]['nouseNum'];
+    	  		}
+    	  		$return['status']   =  200  ;
+			$return['msg']      =  'success';
+			$return['data']     =  $data;	
+    	  	}else{
+    	  		$return['status']   =  300;
+			$return['msg']      =  '缺少参数';
+    	  	}
+    	  	
+    	  	if($param) {
+    	  		return $return;
+    	  	}else{
+    	  		json_return($return, $postData['test']);
+    	  	}
     	}
     	
     	// 更新订单状态接口
