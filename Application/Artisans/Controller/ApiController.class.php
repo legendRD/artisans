@@ -578,13 +578,11 @@ class ApiController extends CommonController {
     
     	// 可传参数  CraftsmanId
     	public function capacityByCityProIdDate($param = null) {
-    	  	if(isset($post_data)) {
-    	  		$param = $post_data;
-    	  		$exit_type = 'array';
-    	  	}else{
-    	  		$param = I('request.');
-    	  		$exit_type = 'json';
-    	  	}
+    	  	if(isset($param)) {
+		         $postData = $param;
+		}else{
+		         $postData = I('param.');
+		}
     	  	
     	  	if(isset($postData['ProductId']) && (isset($postData['CityId']) || isset($postData['CraftsmanId'])) && isset($postData['Date'])) {
     	  		$where['crt.State']       =  isset($postData['State'])   ?$postData['State']   :0;
@@ -663,13 +661,11 @@ class ApiController extends CommonController {
     	
     	// 更新订单状态接口
     	public function updateOrderStatus($param = null) {
-    	       if(isset($post_data)) {
-    	  		$param = $post_data;
-    	  		$exit_type = 'array';
-    	  	}else{
-    	  		$param = I('request.');
-    	  		$exit_type = 'json';
-    	  	}
+    	        if(isset($param)) {
+		         $postData = $param;
+		}else{
+		         $postData = I('param.');
+		}
     	  	
     	  	$data['OrderId'] = $postData['id'];
     	  	$res = M('ord_orderinfo')->where('OrderId = %d AND (Status=4 or Status=3 or Status=0)', $data['OrderId'])->find();
@@ -695,14 +691,100 @@ class ApiController extends CommonController {
     	    // 电话号 phone
 	    // 平台来源 type
 	    public function SendCode($param = null) {
-	      	   
+	      	   if(isset($param)) {
+		         $postData = $param;
+		   }else{
+		         $postData = I('param.');
+		   }
+	    	   
+	    	   if(isset($postData['phone']) && isset($postData['type'])) {
+	    	   	$postData['phone'] = trim($postData['phone']);
+	    	   	if(check_phone($postData['phone'])) {
+	    	   		$addData['Phone']	= $postData['phone'];
+		        	$addData['Captcha']	= mt_rand(1000,9999);
+		        	$addData['CreaterTime'] = date("Y-m-d H:i:s",time());
+		        	$addData['LoseTime']	= date("Y-m-d H:i:s",time()+300);
+		        	$addData['Source']	= $postData['type'];
+		        	
+		        	$content = 'XXXXX验证码（'.$postData['Captcha'].'）';
+		        	$sendVerify = D('Comm')->sendShortMsg($addData['Phone'], $content, 'artisans_register');
+		        	if($sendVerify['SendMessageResult']['Resultcode'] == '00') {
+		        		$where['Phone'] = $postData['phone'];
+		        		$res = M('cut_captcha')
+		        		       ->where($where)
+		        		       ->find();
+		        		if($res) {
+		        			$id = M('cut_captcha')
+		        			      ->where($where)
+		        			      ->save($addData);
+		        		}else{
+		        			$id = M('cut_captcha')
+		        			      ->add($addData);
+		        		}
+		        		if($id) {
+		        			$return['status'] = 200;
+		        			$return['msg']    = 'success';
+		        			$return['code']   = $res;
+		        		}else{
+		        			$return['status'] = 500;
+		        			$return['msg']    = '发送失败';
+		        			$return['code']   = $res;
+		        		}
+		        	}else{
+		        		$return['status'] = 500;
+			    		$return['msg']    = '发送失败';
+			    		$return['code']   = $sendVerify;
+		        	}
+	    	   	}else{
+	    	   		$return['status']  = 400;
+			 	$return['msg']     = '数据格式错误';
+	    	   	}
+	    	   }else{
+	    	   	$return['status'] = 300;
+    			$return['msg']    = '缺少参数';
+	    	   }
+	    	   
+	    	   if($param) {
+	    	   	return $return;
+	    	   }else{
+	    	   	json_return($return, $postData['test']);
+	    	   }
 	    }
 	    
 	    //验证验证码接口
 	    // 电话号 phone
       	    // 验证码 code
 	    public function CheckCode($param = null) {
-	      
+	      	   if(isset($param)) {
+		         $postData = $param;
+		   }else{
+		         $postData = I('param.');
+		   }
+	    	   
+	    	   if(isset($postData['phone']) && isset($postData['code'])) {
+	    	   	$where['Phone']    = $postData['phone'];
+	    		$where['Captcha']  = $postData['code'];
+	    		$where['LoseTime'] = array('gt',date("Y-m-d H:i:s"));
+	    		$res = M('cut_captcha')->where($where)->find();
+	    		
+	    		if($res) {
+	    			$return['status'] = 200;
+	    			$return['msg']    = 'success';
+	    			$return['info']   = $res;
+	    		}else{
+	    			$return['status']=500;
+    				$return['msg']='验证码过期或验证码错误';
+	    		}
+	    	   }else{
+	    	   	$return['status']=300;
+    			$return['msg']='参数错误';
+	    	   }
+	    	   
+	    	   if($param) {
+	    	   	return $return;
+	    	   }else{
+	    	   	json_return($return, $postData['test']);
+	    	   }
 	    }
 	    
 	    //保存评价接口
