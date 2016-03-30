@@ -300,6 +300,27 @@ class AppAdminController extends CommonController {
 			$this->returnJsonData(200);
 		}
 	}
-
 	
+	//检查数据唯一性
+	public function _checkInfo($content, $type) {
+		if(empty($content)) {
+			return false;
+		}
+		$user_id = false;
+		switch($type) {
+			case 'email':
+				$user_id = M('crt_craftsmaninfo')->where(array('Email'=>$content))->getField('CraftsmanId');
+				break;
+			case 'phone':
+				$user_id = M('crt_craftsmaninfo')->where(array('Phone'=>$content))->getField('CraftsmanId');
+				break;
+			case 'id_card':
+				$user_id = M('crt_craftsmaninfo')->where(array('IdCard'=>$content))->getField('CraftsmanId');
+				break;
+			case 'username':
+				$user_id = M('crt_craftsmaninfo')->where(array('UserName'=>$content))->getField('CraftsmanId');
+				break;
+		}
+		return $user_id;
+	}
 }
