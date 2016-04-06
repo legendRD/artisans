@@ -385,4 +385,161 @@ class AppAdminController extends CommonController {
 	public function instPhone() {
 		
 	}
+	
+	//注册接口 （各个信息必须非空）
+	public function regUser() {
+		$postData = I('request.');
+		if($_FILES['img']) {
+			//判断有没有图片
+			$file        = $_FILES['img'];
+			$count       = count($file['name']);
+			$phone 	     = trim($postData['phone'])
+			$verify_code = trim($postData['verify_code']);
+			$name        = trim($postData['name']);
+			$id_card     = trim($postData['id_card']);
+			$email       = trim($postData['email']);
+			$passwd      = $postData['passwd'];
+			$address     = $postData['address'];
+			$lat 	     = $postData['lat'];
+			$lng         = $postData['lng'];
+			$city        = $postData['city'];
+			$district_arr= $postData['district'];
+			
+			if(!($phone && $verify_code && $passwd && $name && $id_card && $email && $address && $lat && $lng && $city && $district_arr || $count<3)) {
+				$this->returnJsonData(300);
+			}
+			if(!check_phone($phone)) {
+				$this->returnJsonData(1003);
+			}
+			if(!is_idcard($id_card)) {
+				$this->returnJsonData(503);
+			}
+			if(!check_email($email)) {
+				$this->returnJsonData(505);
+			}
+			
+			//检查数据一致性
+			if($this->_checkInfo($email,'email')) {
+				$this->returnJsonData(506);
+			}
+			if($this->_checkInfo($phone,'phone')) {
+				$this->returnJsonData(501);
+			}
+			if($this->_checkInfo($id_card,'id_card')) {
+				$this->returnJsonData(504);
+			}
+			
+			//检查验证码
+			$timeout = $this->_checkVerify($phone, $verify_code);
+			if($timeout === 'timeout') {
+				$this->returnJsonData(1004);
+			}else{
+				$this->returnJsonData(500);
+			}
+			$data = array();
+			$data['State']		= 0;
+			$data['IsDelete']	= 0;
+			$data['UserName']	= '';
+			$data['Password']	= md5($passwd);
+			$data['TrueName']	= $name;
+			$data['IdCard']		= $id_card;
+			$data['Source']		= 1;	//暂定  目前设为1代表app端
+			$data['Lat']		= $lat;
+			$data['Lng']		= $lng;
+			$data['Email']		= $email;
+			$data['Address']	= $address;
+			$data['City']		= $city;
+			$data['CreaterTime']	= date('Y-m-d H:i:s');
+			$data['Phone']		= $phone;
+			
+			$img_root_path	= C('UPLOAD_WX_IMG');
+			$save_path	= './artisans/app/headImg/';
+			$config = array(
+					'maxSize'=>2097152, //设置附件上传大小 2M
+					'rootPath'=>$img_root_path,
+					'savePath'=>$save_path,
+					'saveName'=>array('uniqid',''),
+					'exts'=>array('jpg', 'gif', 'png', 'jpeg'),
+					'autoSub'=>true,
+					'subName'=>array('date','Ymd'),
+			);
+			$upload = new \Think\Upload($config);
+			$info   =   $upload->upload();
+			if($info) {
+				foreach($info as $key=>$value) {
+					if($key == 0) {
+						$photo      = C('VIEW_WX_IMG').trim($save_path, './').'/'.$val['savename'];
+					}
+					if($key == 1) {
+						$id_card_p1 = C('VIEW_WX_IMG').trim($save_path, './').'/'.$val['savename'];
+					}
+					if($key == 2) {
+						$id_card_p2 = C('VIEW_WX_IMG').trim($save_path, './').'/'.$val['savename'];
+					}
+				}
+			}else{
+				$this->returnJsonData(1005, array(), $upload->getErrorMsg());
+			}
+			$data['IdCardImg1']	= $id_card_p1;
+			$data['IdCardImg2']	= $id_card_p2;
+			$data['HeadImgUrl']	= $photo;
+			$data['IsCheck']	= 1;
+			$id	= M('crt_craftsmaninfo')->add($data);
+			if($id) {
+				foreach($district_arr as $district_id) {
+					$tmp['CreaterTime']	= $data['CreaterTime'];
+					$tmp['DistrictId']	= $district_id;
+					$tmp['CraftsmanId']	= $id;
+					$hash[]	= $tmp;
+				}
+				unset($tmp);
+				if($hash) {
+					M('crt_craftsman_district')->addAll($hash);
+				}
+				$this->returnJsonData(200);
+			}
+			$this->returnJsonData(500);
+		}
+		$this->returnJsonData(300);
+	}
+	
+	//发送验证码，可用于修改密码、手机号、注册
+	public function sendCodeRepasswd() {
+		$postData	= I('request.');
+		$phone		= $postData['phone'];
+		$action		= $postData['action'];
+		if(!($phone && $action)) {
+			$this->returnJsonData(300);
+		}
+		if(!check_phone($phone)) {
+			$this->returnJsonData(1003);
+		}
+		
+		if($action == 'passwd') {
+			$log_name = 'app_admin_update_repasswd';
+			$user_id  = $this->_checkInfo($phone, 'phone');
+			if(!$user_id) {
+				$this->returnJsonData(507);
+			}
+		}elseif($action == 'register') {
+			$log_name = 'app_admin_register';
+			$user_id  = $this->_checkInfo($phone, 'phone');
+			if($user_id) {
+				$this->returnJsonData(501);
+			}
+		}elseif($action == 'phone') {
+			$log_name = 'app_admin_update_phone';
+		}
+		
+		$verify_code	= mt_rand(1000,9999);
+		$verify_msg	= 'XXXXX验证码('.$verify_code.')';
+		$send_status	= $this->_insertVerify($phone,$verify_code,$verify_msg,$log_name);
+		if($send_status) {
+			$this->returnJsonData(200);
+		}else{
+			$this->returnJsonData(500);
+		}
+	}
+	
+	
 }
