@@ -323,4 +323,66 @@ class AppAdminController extends CommonController {
 		}
 		return $user_id;
 	}
+	
+	//个人资料
+	public function getBaseInfo() {
+		$postData = I('request.');
+		$user_id  = $postData['user_id'];
+		if(empty($user_id)) {
+			$this->returnJsonData(300);
+		}
+		$user_info = M('crt_craftsmaninfo')
+			     ->where("CraftsmanId=%d", $user_id)
+			     ->field('CraftsmanId, UserName, TrueName, IdCard, HeadImgCdnUrl, HeadImgUrl, Description, Lat, Lng, Email, Phone, Address, City, Bank, BankCard, CardName, BankProvince, BankCity')
+			     ->find();
+		if($user_info) {
+			$data['user_id']	= (int)$user_info['CraftsmanId'];
+			$data['user_name']	= (string)$user_info['UserName'];
+			$data['name']		= (string)$user_info['TrueName'];
+			$data['id_card']	= (string)$user_info['IdCard'];
+			$data['description']    = (string)$user_info['Description'];
+			$data['email']		= (string)$user_info['Email'];
+			$data['phone']		= (string)$user_info['Phone'];
+			$data['address']	= (string)$user_info['Address'];
+			$data['bankname']	= (string)$user_info['Bank'];
+			$data['bankcard']	= (string)$user_info['BankCard'];
+			$data['account_name']	= (string)$user_info['CardName'];
+			$data['bankprovince']	= (string)$user_info['BankProvince'];
+			$data['bankcity']	= (string)$user_info['BankCity'];
+			$data['photo']		= I('server.HTTP_HOST').$user_info['HeadImgUrl'];
+			$data['lat']		= floatval($user_info['Lat']);
+			$data['lng']		= floatval($user_info['Lng']);
+			if($user_info['City']) {
+				$city_info = M()
+					     ->table('sys_city sc')
+					     ->join('left join sys_province sp on sp.ProvinceId = sc.ProvinceId')
+					     ->where(array('CityId'=>$user_info['City']))
+					     ->field("CityName city_name, ProvinceName p_name")
+					     ->find();
+				$data['city_id']   = (int)$user_info['City'];
+				$data['city_name'] = (string)$city_info['city_name'];
+				$province_name	   = (string)$city_info['p_name'];
+			}else{
+				$data['city_id']	= '';
+				$data['city_name']	= '';
+				$province_name		= '';
+			}
+			//获取服务城区
+			$district_arr		= D('Admin')->getDistrict($user_id);
+			$data['service_district'] = array();
+			forach((array)$district_arr as $value) {
+				$tmp['content']   = $province_name.'-'.$data['city_name'].'-'.$value['DistrictName'];
+				$tmp['district_id'] = $value['DistrictId'];
+				$data['service_district'][] = $tmp;
+			}
+			unset($tmp);
+			$this->returnJsonData(200, $data);
+		}
+		$this->returnJsonData(500);
+	}
+	
+	//修改手机号
+	public function instPhone() {
+		
+	}
 }
