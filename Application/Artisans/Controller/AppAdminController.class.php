@@ -868,8 +868,18 @@ class AppAdminController extends CommonController {
 			$time_id_arr    = $value['time_id'];
 			if($time_id_arr) {
 				//添加、修改
+				$time_str = ','.trim(implode(',', $time_id_arr), ',').',';
+				$id = M('crt_capacity_template')->where("CraftsmanId=%d and WeekId=%d", $user_id, $week_id)->save(array('TimeStr'=>$time_str, 'UpdateTime'=>date('Y-m-d H:i:s')));
+				if(!$id) {
+					$data['CraftsmanId'] = $user_id;
+					$data['WeekId']      = $week_id;
+					$data['TimeStr']     = $time_str;
+					$data['CreaterTime'] = date('Y-m-d H:i:s');
+					M('crt_capacity_template')->add($data);
+				}
 			}else{
 				//删除
+				M('crt_capacity_template')->where("CraftsmanId=%d and WeekId=%d", $user_id, $weed_id)->delete();
 			}
 		}
 		$this->returnJsonData(200);
