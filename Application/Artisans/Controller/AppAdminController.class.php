@@ -884,4 +884,21 @@ class AppAdminController extends CommonController {
 		}
 		$this->returnJsonData(200);
 	}
+	
+	private function wInfoLog($data, $prefix='') {
+		if($this->_log_open_status) {
+			$log_suffix_name = 'appadmin'.date('Ymd').'.log';	  //日志文件名
+			$log_url         = $this->_info_log_url.$log_suffix_name; //日志文件路径
+			if(is_array($data)) {
+				wlog($log, $prefix.serialize($data), FIEL_APPEND);
+			}else{
+				wlog($log_url, $data, FILE_APPEND);
+			}
+		}
+	}
+	
+	//增加用户银行卡信息
+	public function addBank() {
+		
+	}
 }
