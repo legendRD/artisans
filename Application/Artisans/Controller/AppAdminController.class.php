@@ -383,7 +383,33 @@ class AppAdminController extends CommonController {
 	
 	//修改手机号
 	public function instPhone() {
+		$postData	= I('request.');
+		$phone		= $postData['phone'];
+		$verify_code    = $postData['verify_code'];
+		$user_id	= $postData['user_id'];
+		if(!($phone && $user_id && $verify_code)) {
+			$this->returnJsonData(300);
+		}
+		if(!check_phone($phone)) {
+			$this->returnJsonData(1003);
+		}
 		
+		//检查验证码
+		$timeout	= $this->_checkVerify($phone,$verify_code);
+		if($timeout === 'timeout') {
+			$this->returnJsonData(1004);
+		}elseif($timeout) {
+			$data = array(
+				'CreaterTime'=>date('Y-m-d H:i:s'),
+				'Phone'=>$phone
+			);
+			$id   = M('crt_craftsmaninfo')->where(array('CraftsmanId'=>$user_id))->save($data);
+			if($id) {
+				$this->returnJsonData(200);
+			}
+		}else{
+			$this->returnJsonData(508);
+		}
 	}
 	
 	//注册接口 （各个信息必须非空）
@@ -541,5 +567,98 @@ class AppAdminController extends CommonController {
 		}
 	}
 	
+	//找回密码   校验验证码
+	public function checkCodeRepasswd() {
+		$postData	= I('request.');
+		$phone		= $postData['phone'];
+		$verify_code    = $postData['verify_code'];
+		$action		= $postData['action'];
+		if(!($phone && $verify_code)) {
+			$this->returnJsonData(300);
+		}
+		if(!check_phone($phone)) {
+			$this->returnJsonData(1003);
+		}
+		
+		if($action == 'passwd') {
+			$user_id	= $this->_checkInfo($phone,'phone');
+			if(!$user_id) {
+				$this->returnJsonData(507);
+			}
+		}elseif($action == 'register') {
+			$user_id	= $this->_checkInfo($phone,'phone');
+			if($user_id) {
+				$this->returnJsonData(501);
+			}
+		}elseif($action == 'phone') {
+		
+		}
+		
+		$timeout	= $this->_checkVerify($phone,$verify_code);
+		if($timeout === 'timeout') {
+			$this->returnJsonData(1004);
+		}elseif($timeout) {
+			$this->returnJsonData(200);
+		}else{
+			$this->returnJsonData(508);
+		}
+	}
 	
+	//重设密码
+	public function instPasswd() {
+		$postData	= I('request.');
+		$phone		= $postData['phone'];
+		$passwd		= md5($postData['passwd']);
+		$time		= date('Y-m-d H:i:s');
+		if(!($phone && $passwd)) {
+			$this->returnJsonData(300);
+		}
+		if(!check_phone($phone)) {
+			$this->returnJsonData(1003);
+		}
+		$id	= M('crt_craftsmaninfo')->where(array('Phone'=>$phone))->save(array('Password'=>$passwd,'UpdateTime'=>$time));
+		if($id) {
+			$this->returnJsonData(200);
+		}else{
+			$this->returnJsonData(500);
+		}
+	}
+	
+	//检查验证码是否过期
+	private function _checkVerify($phone,$verify_code){
+		$where	= array('Phone'=>$phone,'Captcha'=>$verify_code,'Source'=>1);
+		$edate	= M('cut_captcha')->where($where)->getField('LoseTime');
+		if($edate){
+			$second	= time()-strtotime($edate);
+			if($second<0){
+				return true;
+			}else{
+				return 'timeout';
+			}
+		}
+		return false;
+	}
+	
+	//检查数据唯一性
+	private function _checkInfo($content, $type) {
+		if(empty($content)) {
+			return false;
+		}
+		$user_id = false;
+		switch($type) {
+			case 'email':
+				$user_id	= M('crt_craftsmaninfo')->where(array('Email'=>$content))->getField('CraftsmanId');
+				break;
+			case 'phone':
+				$user_id	= M('crt_craftsmaninfo')->where(array('Phone'=>$content))->getField('CraftsmanId');
+				break;
+			case 'id_card':
+				$user_id	= M('crt_craftsmaninfo')->where(array('IdCard'=>$content))->getField('CraftsmanId');
+				break;
+			case 'username':
+				$user_id	= M('crt_craftsmaninfo')->where(array('UserName'=>$content))->getField('CraftsmanId');
+				break;
+		}
+		return $user_id;
+	}
 }
