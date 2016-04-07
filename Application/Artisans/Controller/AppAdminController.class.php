@@ -661,4 +661,166 @@ class AppAdminController extends CommonController {
 		}
 		return $user_id;
 	}
+	
+	//修改邮箱
+	public function instEmail() {
+		$postData	= I('request.');
+		$email		= $postData['email'];
+		$user_id	= $postData['user_id'];
+		if(!($email && $user_id)) {
+			$this->returnJsonData(300);
+		}
+		if(!check_email($email)) {
+			$this->returnJsonData(505);
+		}
+		$user_id_s = M('crt_craftsmaninfo')->where(array('Email'=>$email, 'CraftsmanId'=>array('neq', $user_id)))->getField('CraftsmanId');
+		if($user_id_s) {
+			$this->returnJsonData(506);
+		}else{
+			$id	= M('crt_craftsmaninfo')->where(array('CraftsmanId'=>$user_id))->save(array('Email'=>$email,'CreaterTime'=>date('Y-m-d H:i:s')));
+			if($id) {
+				$this->returnJsonData(200);
+			}else{
+				$this->returnJsonData(500);
+			}
+		}
+	}
+	
+	//修改我的位置
+	public function instaddress() {
+		$postData	= I('request.');
+		$data['lat']	= $lat = $postData['lat'];
+		$data['lng']	= $lng	= $postData['lng'];
+		$data['address']= $address	= trim($postData['address']);
+		$data['user_id']= $user_id	= $postData['user_id'];
+		if(!($lat && $lng && $address && $user_id)) {
+			$this->returnJsonData(300);
+		}
+		$status	= $this->_editBaseinfo($data);
+		if($status) {
+			$this->returnJsonData(200);
+		}else{
+			$this->returnJsonData(500);
+		}
+	}
+	
+	//修改个人说明
+	public function instDesc() {
+		$postData	        = I('request.');
+		$data['description']	= $description   = $postData['description'];
+		$data['user_id']	= $user_id       = $postData['user_id'];
+		if(!($user_id))	{
+			$this->returnJsonData(300);
+		}
+		$status	= $this->_editBaseinfo($data);
+		if($status) {
+			$this->returnJsonData(200);
+		}else{
+			$this->returnJsonData(500);
+		}
+	}
+	
+	private function _editBaseinfo($data) {
+		if($data && is_array($data)) {
+			$user_id = $data['user_id'];
+			if(!$user_id) {
+				return false;
+			}
+			
+			if(isset($data['lat'])) {
+				$hash['Lat'] = $data['lat'];
+			}
+			if(isset($data['lng'])) {
+				$hash['Lng'] = $data['lng'];
+			}
+			if(isset($data['address'])) {
+				$hash['Address'] = $data['address'];
+			}
+			if(isset($data['description'])) {
+				$hash['Description'] = $data['description'];
+			}
+			unset($data);
+			if($hash) {
+				$id = M('crt_craftsmaninfo')->where(array('CraftsmanId'=>$user_id))->save($hash);
+			}
+			if($id) {
+				return true;
+			}else{
+				return false;
+			}
+		}else{
+			return false;
+		}
+	}
+	
+	//删除城区
+	public function DelDistrict() {
+		$postData	= I('request.');
+		$user_id	= $postData['user_id'];
+		$district_id	= $postData['district_id'];
+		if(!($user_id && $district_id)) {
+			$this->returnJsonData(300);
+		}
+		$id = M('crt_craftsman_district')->where("CraftsmanId=%d and DistrictId=%d", $user_id, $district_id)->delete();
+		if($id) {
+			//如果用户删除所有的城区，那么XXX表中城市id赋值为0
+			$count = M('crt_craftsman_district')->where("CraftsmanId=%d and DistrictId<>%d", $user_id, $district_id)->count();
+			if($count == 0) {
+				M('crt_craftsmaninfo')->where("CraftsmanId=%d", $user_id)->save(array('City'=>0, 'UpdateTime'=>date('Y-m-d H:i:s')));
+			}
+			$this->returnJsonData(200);
+		}else{
+			$this->returnJsonData(500);
+		}
+	}
+	
+	//添加城区
+	public function AddDistrict() {
+		$postData	= I('request.');
+		$user_id	= $postData['user_id'];
+		$district_id    = $postData['district_id'];
+		$city_id	= $postData['city_id'];
+		if(!($user_id && $district_id && $city_id)) {
+			$this->returnJsonData(300);
+		}
+		$data	= array(
+				'CraftsmanId'=>$user_id,
+				'DistrictId' =>$district_id,
+				'CreaterTime'=>date('Y-m-d H:i:s')
+		);
+		$id = M('crt_craftsman_district')->add($data);
+		if($id) {
+			$count = M('crt_craftsman_district')->where("CraftsmanId=%d", $user_id)->count();
+			if($count == 0) {
+				M('crt_craftsmaninfo')->where("CraftsmanId=%d", $user_id)->save(array('City'=>$city_id));
+			}
+			$user_info = M()->table('sys_district sd')
+					->join('left join sys_city sc on sd.CityId = sc.CityId')
+					->join('left join sys_province sp on sc.ProvinceId = sp.ProvinceId')
+					->where("sd.DistrictId=%d", $district_id)
+					->field('sc.CityName as city_name, sp.ProvinceName as p_name, sd.DistrictName as district_name')
+					->find();
+			$content = $user_info['p_name'].'-'.$user_info['city_name'].'-'.$user_info['district_name'];
+			$hash    = array('content'=>$content, 'district_id'=>$district_id);
+			$this->returnJsonData(200, $hash);
+		}else{
+			$this->returnJsonData(500);
+		}
+		
+		//时间模板
+		public function capacityTemplate() {
+			$post_data = I('request.');
+			$user_id   = $post_data['user_id'];
+			if(empty($user_id)) {
+				$this->returnJsonData(300);
+			}
+			$time_info = M('prd_servicetime')->where('IsDelete=0')->order('StartTime asc')->field('StartTime, TimeIe')->select();
+			foreach((array)$time_info as $value) {
+				$time_arr[$value['TimeId']] = $vlaue['StartTime'];
+			}
+			unset($time_arr);
+			$capacity_template	= M('crt_capacity_template')->where("CraftsmanId=%d",$user_id)->select();
+			
+		}
+	}
 }
