@@ -820,7 +820,58 @@ class AppAdminController extends CommonController {
 			}
 			unset($time_arr);
 			$capacity_template	= M('crt_capacity_template')->where("CraftsmanId=%d",$user_id)->select();
-			
+			foreach($capacity_template as $value) {
+				$capacity_temp_arr[$value['WeekId']]['template_id']	= $value['TemplateId'];
+				$capacity_temp_arr[$value['WeekId']]['user_id']	= $value['CraftsmanId'];
+				$capacity_temp_arr[$value['WeekId']]['week_id']	= $value['WeekId'];
+				$time_id_arr	= explode(',',trim($value['TimeStr'],','));
+				$capacity_temp_arr[$value['WeekId']]['time_arr_id']= $time_id_arr;
+			}
+			unset($capacity_template);
+			$week_info_s = $this->_weekId_s;
+			$data = array();
+			foreach((array)$week_info_s as $week_id => $value) {
+				$tmp = array();
+				$tmp['week'] = (string)$value;
+				$tmp['week_id'] = (int)$week_id;
+				$tmp['content'] = array();
+				foreach((array)$time_arr as $time_id => $time_txt) {
+					$time = array();
+					$time['time'] = (string)$time_txt;
+					$time['time_id'] = (int)$time_id;
+					if(in_array($time_id, $capacity_temp_arr[$week_id]['time_arr_id'])) {
+						$time['state']	= true;
+					}else{
+						$time['state']	= false;
+					}
+					$tmp['content'][]	= $time;
+				}
+				$data[] = $tmp;
+			}
+			$hash['user_id'] = $user_id;
+			$hash['data']    = $data;
+			$this->returnJsonData(200, $hash);
 		}
+	}
+	
+	//更新产能模板
+	public function updateCapacityTemplate() {
+		$json_string = file_get_contents('php://input');
+		$post_data   = json_decode($json_string, true);
+		$user_id	= $post_data['user_id'];
+		$time_arr	= $post_data['data'];
+		if(!($user_id && $time_arr)) {
+			$this->returnJsonData(300);
+		}
+		foreach((array)$time_arr as $value) {
+			$week_id	= $value['week_id'];
+			$time_id_arr    = $value['time_id'];
+			if($time_id_arr) {
+				//添加、修改
+			}else{
+				//删除
+			}
+		}
+		$this->returnJsonData(200);
 	}
 }
