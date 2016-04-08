@@ -899,6 +899,137 @@ class AppAdminController extends CommonController {
 	
 	//增加用户银行卡信息
 	public function addBank() {
+		$postdata	= I('post.');
+		$user_id	= $postdata['user_id'];
+		$phone		= $postdata['phone'];
 		
+		if(!($user_id && $phone)) {
+			$this->returnJsonData(300);
+		}
+		if(!check_phone($phone)) {
+			$this->returnJsonData(1003);
+		}
+		
+		$data['Bank']		= trim($postdata['bankname']);
+		$data['BankCard']	= trim($postdata['bankcard']);
+		$data['CardName']	= trim($postdata['account_name']);
+		$data['BankProvince']	= trim($postdata['bankprovince']);
+		$data['BankCity']	= trim($postdata['bankcity']);
+		
+		$where = array(
+			'CraftsmanId'=>$user_id,
+			'Phone'=>$phone
+		);
+		
+		$id = M('crt_craftsmaninfo')->where($where)->save($data);
+		if($id) {
+			$this->returnJsonData(200);
+		}else{
+			$this->returnJsonData(500);
+		}
+	}
+	
+	//查看银行卡信息
+	public function viewBank() {
+		$postdata	= I('post.');
+		$user_id	= $postdata['user_id'];
+		$phone		= $postdata['phone'];
+		
+		if(!($user_id && $phone)) {
+			$this->returnJsonData(300);
+		}
+		if(!check_phone($phone)) {
+			$this->returnJsonData(1003);
+		}
+		
+		$where = array(
+			'CraftsmanId'=>$user_id,
+			'Phone'=>$phone
+		);
+		
+		$info = M('crt_craftsmaninfo')->where($where)->find();
+		if($info) {
+			$data['bankname']		= (string)$info['Bank'];
+			$data['bankcard']		= (string)$info['BankCard'];
+			$data['account_name']	        = (string)$info['CardName'];
+			$data['bankprovince']	        = (string)$info['BankProvince'];
+			$data['bankcity']		= (string)$info['BankCity'];
+		}else{
+			$data	= array();
+		}
+		$this->returnJsonData(200, $data);
+	}
+	
+	//修改用户银行卡信息
+	public function editBank() {
+		$postdata	= I('post.');
+		$user_id	= $postdata['user_id'];
+		$phone		= $postdata['phone'];
+		
+		if(!($user_id && $phone)) {
+			$this->returnJsonData(300);
+		}
+		if(!check_phone($phone)) {
+			$this->returnJsonData(1003);
+		}
+		
+		$data['Bank']		= trim($postdata['bankname']);
+		$data['BankCard']	= trim($postdata['bankcard']);
+		$data['CardName']	= trim($postdata['account_name']);
+		$data['BankProvince']	= trim($postdata['bankprovince']);
+		$data['BankCity']	= trim($postdata['bankcity']);
+		
+		$where = array(
+			'CraftsmanId'=>$user_id,
+			'Phone'=>$phone
+		);
+		
+		$info = M('crt_craftsmaninfo')->where($where)->find();
+		if($info['Bank'] == $data['Bank'] 
+	        && $info['BankCrad'] == $data['BankCard'] 
+	        && $info['CardName'] == $data['CardName'] 
+	        && $info['BankProvince'] == $data['BankProvince'] 
+	        && $info['BankCity'] == $data['BankCity']) {
+			$this->returnJsonData(200);
+		}else{
+			$id = M('crt_craftsmaninfo')->where($where)->save($data);
+			if($id) {
+				$this->returnJsonData(200);
+			}else{
+				$this->returnJsonData(500);
+			}
+		}
+	}
+	
+	//删除用户银行卡信息
+	public function delBank() {
+		$postdata	= I('post.');
+		$user_id	= $postdata['user_id'];
+		$phone		= $postdata['phone'];
+		
+		if(!($user_id && $phone)) {
+			$this->returnJsonData(300);
+		}
+		if(!check_phone($phone)) {
+			$this->returnJsonData(1003);
+		}
+		
+		$data['Bank']		= '';
+		$data['BankCard']	= '';
+		$data['CardName']	= '';
+		$data['BankProvince']	= '';
+		$data['BankCity']	= '';
+		
+		$where = array(
+			'CraftsmanId'=>$user_id,
+			'Phone'=>$phone
+		);
+		
+		$id = M('crt_craftsmaninfo')->where($where)->save($data);
+		if($id) {
+			$this->returnJsonData(200);
+		}else{
+			$this->returnJsonData(500);
+		}
 	}
 }
