@@ -60,7 +60,52 @@ class WxPayController extends CommonController {
 	     //将数据解析后存入表中 获取支付用户表的字段数组
 	     $payment_user_fields    = M("pay_payment_userinfo")->getDbFields();
 	     $userinfo               = $this->parseXml($userParam, $payment_user_fields);
+	     $userinfo['create_time']= array('exp', 'now()');
+	     $userinfo['status']     = 1;
+	     $userinfo_flag 	     = M('pay_payment_userinfo')->add($userinfo);
+	     
+	     //判断是否插入成功
+	     if(!$userinfo_flag) {
+	     	    wlog($this->_error_url, mysql_error().'mysql'.M('pay_payment_order')->getLastSql());
+	     }
+	     
+	     //更新订单状态及发送消息，其中trade_state为财付通返回，0代表成功
+	     $trade_state = true;
+	     if($orderParam['trade_state'] == '0') {
+	     	
+	     	    //该订单支付信息在表中的记录次数
+	     	    $paymentoutcount = M('pay_payment_order')->where("trade_state='0' and out_trade_no='".$orderParam['out_trade_no']."'")->count();
+	     	    wlog($this->_success_url, M('pay_payment_order')->getLastSql().'--order count:'.$paymentoutcount);
+	     	    
+	     	    //只有获取第一次通知记录更新订单状态
+	     	    if($paymentoutcount == 1) {
+	     	    	$usershopid = $orderParam['out_trade_no'];	//订单号
+	     	    	$artisans_order = M('ord_orderinfo')->where("VmallOrderId='".$usershopid."'")->find();
+	     	    	wlog($this->_success_url, $artisans_order);
+	     	    	if($artisans_order) {
+	     	    		$artisans_order['Status']	 = $data['Status']      = 3;
+				$comm_time			 = date('Y-m-d H:i:s');
+				$artisans_order['UpdateTime']    = $data['UpdateTime']	= $comm_time;
+				$artisans_order['PayTime']	 = $data['PayTime']	= $comm_time;
+				
+				//修改用户订单状态为已支付
+				$usershop_res = M('ord_orderinfo')->where("VmallOrderId='".$usershopid."'")->save($data);
+				
+				//记录错误日志
+				if(!$usershop_res) {
+					
+					//如果更新失败，则计入错误日志
+					file_put_contens($this->pay_log_url, "artisans_cft_log.txt", date('Y-m-d H:i:s').'--->用户订单更新支付状态失败,对应的订单号为:'.$usershopid.':from:notice'.'\r\n', FIEL_APPEND);
+					$trade_state = false;
+					wlog($this->_success_url, 'update status fail! mysql: '.M()->getLastSql());
+				}else{
+					//发送消息, 调取接口
+					$this->_paySuccessDeal($artisans_order);
+					wlog($this->_success_url, ' update status success!');
+				}
+	     	    	}
+	     	    }
+	     }
       }
-      
       
 }
