@@ -187,5 +187,103 @@ class WxPayController extends CommonController {
 		$ret = $this->orderQueryApi($out_trade_no);
 		
 		//解析返回的订单结果
+		$error_code = $ret['errcode'];
+		if(isset($error_code) && $error_code == 0) {
+			//调用接口成功，获取订单详情
+			$order_info = $ret['order_info'];
+			if($order_info['ret_code'] == 0) {
+				//如果订单获取成功
+				$trade_state = $order_info['trade_state'];
+				if($trade_state == 0) {
+					$countnum = M('pay_payment_order')->where(" OpenId='{$openid}' and out_trade_no='{$out_trade_no}' and trade_state=0 ")->count();
+					if($countnum == 0) {
+						//重新生成微信订单信息
+						$order_info['status']      = 1;
+						$order_info['flag']        = 2;
+						$order_info['OpenId']      = $openid;
+						$order_info['create_time'] = array('exp', 'now()');
+						$return_num = M('pay_payment_order')->add($order_info);
+						wlog($this->_findwx_order_url, 'payment_order_id: '.$return_num);
+						
+						//查询并更新系统订单的状态
+						$artisans_order = M('ord_orderinfo')->where(" VmallOrderId='{$out_trade_no}'")->find();
+						wlog($this->_findwx_order_url, $artisans_order);
+						if($artisans_order['Status'] == 0) {
+							$artisans_order['Status']	= $data['Status']       = 3;
+							$comm_time			= date('Y-m-d H:i:s');
+							$artisans_order['UpdateTime']   = $data['UpdateTime']	= $comm_time;
+							$artisans_order['PayTime']	= $data['PayTime']	= $comm_time;
+							$return_num = M("ord_orderinfo")->where(" VmallOrderId='".$out_trade_no."' and Status=0 ")->save($data);
+							if($return_num) {
+								$status	= true;
+								$this->_paySuccessDeal($artisans_order); //发送消息 ,调取接口
+								wlog($this->_findwx_order_url,"findwxorder update status success !");
+							}else{
+								wlog($this->_findwx_order_url,"findwxorder update status fail ! mysql: ".M()->getLastSql());
+							}
+						}
+					}
+				}
+			}
+		}
+	      wlog($this->_findwx_order_url,"------------end------------");
+	      if($status) {
+	      	        return json_encode(array('status'=>200));
+	      }else{
+	      	        return json_encode(array('status'=>0));
+	      }
+      }
+      
+      //订单查询接口
+      public function orderQueryApi($out_trade_no) {
+      	     //只需要获取一个out_trade_no来完成
+      	     $appid      = C("APPID");		//appid
+      	     $partner    = C("PARTNERID"); 	//商户号
+      	     $partnerkey = C("PARTNERKEY");	//商户key
+      	     $appkey     = C("PAYSIGNKEY");	//支付签名pagsignkey
+      	     //生成sign签名
+      	     $con_str = 'out_trade_no'.$out_trade_no.'&partner='.$partner.'&key='.$partnerkey;
+      	     $sign = strtoupper(md5($con_str));
+      	     //生成package签名
+      	     $package = 'out_trade_no'.$out_trade_no.'&partner='.$partner.'&sign='.$sign;
+      	     //获取linux时间戳
+      	     $timestamp = time();
+      	     //生成app_signature签名
+      	     $con_str = "appid=$appid&appkey=$appkey&package=$package&timestamp=$timestamp";
+      	     
+      	     $app_signature = sha1($con_str);
+      	     
+      	     //组装订单查询参数
+      	     $post_array                  = array();
+      	     $post_array['appid']         = $appid;
+      	     $post_array['package']       = $package;
+      	     $post_array['timestamp']     = $timestamp;
+      	     $post_array['app_signature'] = $app_signature;
+      	     $post_array['sign_method']   = 'sha1';
+      	     
+      	     //对数组进行json_encode编码
+      	     $post_data = json_encode($post_array);
+      	     
+      	     //订单查询接口
+      	     $url = 'https://api.weixin.qq.com/pay/orderquery?access_token='.$this->token;
+      	     $ret = send_curl($url, $post_data, C('PROXY'));
+      	     
+      	     //分析订单的查询结果
+      	     return json_decode($ret, true);
+      }
+      
+      //核销卡券，发送消息
+      private function _paySuccessDeal($param) {
+      	      $order_status_info['order_id']	= $param['OrderId'];
+	      $order_status_info['state']	= 3;
+	      $order_status_info['create_time']	= array('exp','now()');
+	      $trans_status = D('PayApi')->addOrderState($order_status_info);	//订单状态
+	      unset($order_status_info);
+	      $pay_code = M('ord_pay')->where(array('OrderId'=>$param['OrderId'], 'PayWay'=>1))->getField('PayCode');
+	      $pay_code_arr = explode(',', $pay_code);
+	      
+	      $param['codeid'] = $pay_code_arr[0];
+	      $param['cardid'] = $pay_code_arr[1];
+	      $pro_info	       = M('ord_order_item')->where("OrderId=%d", $param['OrderId'])->field('ProductName, ProductId')->find();
       }
 }
