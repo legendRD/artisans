@@ -68,6 +68,13 @@ class WxPayController extends CommonController {
 	     if(!$userinfo_flag) {
 	     	    wlog($this->_error_url, mysql_error().'mysql'.M('pay_payment_order')->getLastSql());
 	     }
+	     $orderParam['OpenId'] = $userinfo['OpenId'];
+	     $orderParam['create_time'] = array('exp','now()');
+	     $orderParam['status'] = 1;
+	     $order_flag = M('pay_payment_order')->add($orderParam);
+	     if(!$order_flag) {
+	     	wlog($this->_error_url, mysql_error().'mysql'.M('pay_payment_order')->getLastSql());
+	     }
 	     
 	     //更新订单状态及发送消息，其中trade_state为财付通返回，0代表成功
 	     $trade_state = true;
@@ -103,9 +110,53 @@ class WxPayController extends CommonController {
 					$this->_paySuccessDeal($artisans_order);
 					wlog($this->_success_url, ' update status success!');
 				}
+	     	    	}else{
+	     	    		$trade_state = false;
+	     	    		wlog($this->_success_url, " The trade_out_no ".$usershopid." does not exist");
 	     	    	}
 	     	    }
+	     }else{
+	     	  wlog($this->_error_url, "caifutong return error! trade_out_no: ".$orderParam['out_trade_no']);
+	     	  $trade_state = false;
+	     }
+	     if($userinfo_flag && $order_flag && $trade_state) {
+	     	echo 'success';
+	     }else{
+	     	echo 'fail';
 	     }
       }
       
+      //查看订单支付状态是否更新成功
+      public function updateOrder() {
+      	     $post_data = I('post.');
+      	     $out_trade_no = $post_data['out_trade_no'];	//订单号
+      	     wlog($this->_update_url, "------------start------------");
+      	     wlog($this->_update_url, $post_data);
+      	     $openid = $post_data['openid'];
+      	     wlog($this->_update_url, 'openid:'.$openid);
+      	     if(!$openid) {
+      	     	  return json_encode(array('status'=>0, 'out_trade_no'=>$out_trade_no));
+      	     }
+      	     if(C('ProductStatus') === false) {
+      	     	   $orderinfo = M('pay_payment_order')->where(" out_trade_no = '{$out_trade_no}'")->order(" create_time desc ")->limit(1)->field("trade_state, id")->find();
+      	     }else{
+      	     	   $orderinfo = M('pay_payment_order')->where(" OpenId='{$openid}' and out_trade_no = '{$out_trade_no}' ")->order(" create_time desc ")->limit(1)->field("trade_state, id")->find();
+      	     }
+      	     $status = false;
+      	     if(isset($orderinfo['trade_state']) && $order['trade_state'] == 0) {
+      	     		//查看订单状态是否更新，如果没有更新，则更新订单状态
+      	     		$artisans_order	= M('ord_orderinfo')->where(" VmallOrderId='".$out_trade_no."' ")->find();
+			wlog($this->_update_url,$artisans_order);
+			if($artisans_order['Status'] == 3) {
+				$status = true;
+			}
+			if($artisans_order['Status'] == 0) {
+				$artisans_order['Status']     = $data['Status']     = 3;
+				$comm_time   		      = date('Y-m-d H:i:s');
+				$artisans_order['UpdateTime'] = $data['UpdateTime'] = $comm_time; 
+				$artisans_order['PayTime']
+			}
+			
+      	     }
+      }
 }
