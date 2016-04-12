@@ -285,5 +285,12 @@ class WxPayController extends CommonController {
 	      $param['codeid'] = $pay_code_arr[0];
 	      $param['cardid'] = $pay_code_arr[1];
 	      $pro_info	       = M('ord_order_item')->where("OrderId=%d", $param['OrderId'])->field('ProductName, ProductId')->find();
+	      $param['product_name']	= $pro_info['ProductName'];
+	      $param['product_id']	= $pro_info['ProductId'];
+	      $param['craft_phone']	= M('crt_craftsmaninfo')->where(array('CraftsmanId'=>$param['CraftsmanId']))->getField('Phone');
+	      
+	      $pay_api_model	= D('PayApi');
+	      $pay_api_model->cleanKQ($param); //核销卡券
+	      $pay_api_model->sendMsg($param); //发送消息
       }
 }
