@@ -151,22 +151,22 @@ class CraftController extends CommonController {
       }
       
       public function cSubinfo() {
-                  $post_data	              = I('post.');
-                  $data['ProductId']	  = $post_data['pro_id'];
+                $post_data	          = I('post.');
+                $data['ProductId']	  = $post_data['pro_id'];
       		$data['CraftsmanId']	  = $post_data['craft_id'];
       		$data['UserOpenid']	  = $post_data['openid'];
-      		$data['Name']	        = $post_data['name'];
-      		$data['CityName']	        = $post_data['city_id'];
-      		$data['Address']	        = $post_data['address'];
-      		$data['Phone']	        = $post_data['phone'];
+      		$data['Name']	          = $post_data['name'];
+      		$data['CityName']	  = $post_data['city_id'];
+      		$data['Address']	  = $post_data['address'];
+      		$data['Phone']	          = $post_data['phone'];
       		$data['OrderDate']	  = $post_data['order_date'];
       		$data['OrderTimeId']	  = $post_data['order_time_id'];
-      		$data['ForWho']	        = $post_data['for_who'];
+      		$data['ForWho']	          = $post_data['for_who'];
       		$data['ShortMessage']	  = $post_data['wish'];
-      		$data['Lat']	        = $post_data['lat'];
-      		$data['Lng']	        = $post_data['lng'];
-      		$data['Codeid']	        = $post_data['codeid'];
-      		$data['Cardid']	        = $post_data['cardid'];
+      		$data['Lat']	          = $post_data['lat'];
+      		$data['Lng']	          = $post_data['lng'];
+      		$data['Codeid']	          = $post_data['codeid'];
+      		$data['Cardid']	          = $post_data['cardid'];
       		$data['PayProcess']	  = $post_data['pay_process'];
       		$data['CreaterTime']	  = date('Y-m-d H:i:s');
       		
@@ -179,27 +179,27 @@ class CraftController extends CommonController {
       }
       
       public function selectCard() {
-            $this->checkAuthGetParam();
-            
-            $this->_get_param['openid']         = $openid         = $this->_openid;
-            $this->_get_param['uid']            = $uid            = $this->_usercenter_uid;
-            
-            $info = M('ord_submit_info')->where(" UserOpenid='%s'", $openid)->order("InfoId desc")->find();
-            
-            $this->_get_param['city_id']        = $city_id        = $info['CityName'];
-            $this->_get_param['pro_id']         = $pro_id         = $info['ProductId'];          //产品id
-            $this->_get_param['craft_id']       = $craft_id       = $this->_get_param['crt_id']; //XXXid
-            $this->_get_param['address']	      = $info['Address'].'('.$info['AddressInfo'].')';
-            $this->_get_param['address_s']	= $info['Address'];
-		$this->_get_param['address_info']	= $info['AddressInfo'];
-		$this->_get_param['lat']		= $lat		= $info['Lat'];
-		$this->_get_param['lng']		= $lng		= $info['Lng'];
-		$this->_get_param['order_data']     = $info['OrderDate'];                           //预约日期
-		$this->_get_param['order_time_id']  = $info['OrderTimeId'];                         //时间Id
-		$this->_get_param['for_who']        = $info['ForWho'];                              //100为自己，200为朋友
-		$this->_get_param['wish']           = $info['ShortMessage'];
-		$this->_get_param['name']           = $info['Name'];
-		$this->_get_param['phone']          = $info['Phone'];
+                $this->checkAuthGetParam();
+                
+                $this->_get_param['openid']          = $openid          = $this->_openid;
+                $this->_get_param['uid']             = $uid             = $this->_usercenter_uid;
+                
+                $info = M('ord_submit_info')->where(" UserOpenid='%s'", $openid)->order("InfoId desc")->find();
+                
+                $this->_get_param['city_id']         = $city_id         = $info['CityName'];
+                $this->_get_param['pro_id']          = $pro_id          = $info['ProductId'];          //产品id
+                $this->_get_param['craft_id']        = $craft_id        = $this->_get_param['crt_id']; //XXXid
+                $this->_get_param['address']	     = $info['Address'].'('.$info['AddressInfo'].')';
+                $this->_get_param['address_s']	     = $info['Address'];
+		$this->_get_param['address_info']    = $info['AddressInfo'];
+		$this->_get_param['lat']	     = $lat		= $info['Lat'];
+		$this->_get_param['lng']	     = $lng		= $info['Lng'];
+		$this->_get_param['order_data']      = $info['OrderDate'];                           //预约日期
+		$this->_get_param['order_time_id']   = $info['OrderTimeId'];                         //时间Id
+		$this->_get_param['for_who']         = $info['ForWho'];                              //100为自己，200为朋友
+		$this->_get_param['wish']            = $info['ShortMessage'];
+		$this->_get_param['name']            = $info['Name'];
+		$this->_get_param['phone']           = $info['Phone'];
 		
 		$this->_get_param['crt_name']       = M('crt_craftsmaninfo')->where(array('CraftsmanId'=>$this->_get_param['crt_id']))->getField('TrueName');
 		if(!$this->_get_param['pay_process']) {
@@ -351,5 +351,48 @@ class CraftController extends CommonController {
       		}
       		echo json_encode($hash);
       		exit();
+      }
+      
+      public function successPay() {
+      	     $this->checkAuthGetParam();
+      	     $order_id       = $this->_get_param['order_id'];
+      	     $uid            = $this->_usercenter_uid;
+      	     $openid         = $this->_openid;
+      	     $get_order_data = array('order_id'=>$order_id);
+      	     $order_info_s   = A('OrderApi')->getOneOrder($get_order_data);
+      	     $order_info     = $order_info_s['data']; 
+      	     
+      	     // 0 未支付，100支付失败，200取消订单，300已支付，400已服务，500已点评，600申请退款
+      	     $order_info['status_txt'] = $this->_getOrderStatus($order_info);
+      	     $jump_url = 'http://'.$_SERVER['HTTP_HOST'].U('Craft/qcsstatus2').'?ordernum='.$order_id;
+      	     $assign_data['jump_url']	= $jump_url;
+	     $assign_data['openid']	= $openid;
+	     
+	     $this->assign('assign_data',$assign_data);
+	     $this->assign('orderinfo',$order_info);
+	     $this->assign('pagename','XXXXX-支付成功页');
+	     
+	     $this->display('qcs_order');
+      }
+      
+      //查看产品关键步骤
+      public function qcsstatus2() {
+      	     $this->checkAuthGetParam();
+      	     $order_id = $this->_get_param['ordernum'];
+      	     $openid   = $this->_openid;
+      	     $get_order_data = array('order_id'=>$order_id);
+      	     $order_info_s = A('OrderApi')->getOneOrder($get_order_data);
+      	     $order_info   = $order_info_s['data'];
+      	     $order_info['status_txt'] = $this->_getOrderStatus($order_info);
+      	     $uid = $order_info['user_id'];
+      	     if($order_info['openid'] == $openid) {
+      	     	      $user_role = 'user';	//用户
+      	     }else{
+      	     	      $user_role = 'craft';	//XXX
+      	     }
+      	     
+      	     //获取产品关键步骤
+      	     $get_step_data = array('pro_id'=>$order_info['pro_id'], 'order_id'=>$order_id);
+      	     $step_info     = A('Api')->getProductStep($)
       }
 }
