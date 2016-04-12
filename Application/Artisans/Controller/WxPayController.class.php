@@ -154,9 +154,38 @@ class WxPayController extends CommonController {
 				$artisans_order['Status']     = $data['Status']     = 3;
 				$comm_time   		      = date('Y-m-d H:i:s');
 				$artisans_order['UpdateTime'] = $data['UpdateTime'] = $comm_time; 
-				$artisans_order['PayTime']
+				$artisans_order['PayTime']    = $data['PyaTime']    = $comm_time;
+				$res = M('ord_orderinfo')->where(" VmallOrderId='{$out_trade_no}' ")->save($data);
+				if(!$res) {
+					//如果更新失败，则计入到错误日志
+					wlog($this->_update_url, " update status fail ! mysql: ".M()->getLastSql());
+				}else{
+					$status = true;
+					$this->_paySuccessDeal($artisans_order);	//发送消息，调取接口
+					wlog($this->_update_url, ' update status success ! ');
+				}
 			}
 			
       	     }
+      	     wlog($this->_update_url, "------------end------------");
+      	     if($status) {
+      	     	       return json_encode(array('status'=>200, 'out_trade_no'=>$out_trade_no));
+      	     }else{
+      	     	       return json_encode(array('status'=>0,   'out_trade_no'=>$out_trade_no));
+      	     }
+      }
+      
+      //查询微信后台服务器是否成功生成订单
+      public function findwxorder() {
+      		$status = false;
+      		$post_data = I('post.');
+      		wlog($this->_findwx_order_url, "------------start------------");
+		wlog($this->_findwx_order_url, $post_data);
+		$out_trade_no = $post_data['out_trade_no'];
+		$openid       = $post_data['openid'];
+		wlog($this->_findwx_order_url, "openid".$openid);
+		$ret = $this->orderQueryApi($out_trade_no);
+		
+		//解析返回的订单结果
       }
 }
