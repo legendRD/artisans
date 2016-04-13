@@ -533,6 +533,48 @@ class CraftController extends CommonController {
       
       //首页
       public function index() {
-      	
+      	     $this->checkAuthGetParam();
+      	     $uid = $this->_usercenter_uid;
+      	     if($uid) {
+      	     	$status = M('mnitor_visit_log')->where(array('Uid'=>$uid))->find();
+      	     	if(!$status) {
+      	     		$add['time'] = date('Y-m-d H:i:s');
+      	     		$add['Uid']  = $uid;
+      	     		M('mnitor_visit_log')->add($add);
+      	     		header('location:'.U('guide'));
+      	     	}
+      	     }
+      	     
+      	     $field['Name']='title';
+    	     $field['Color']='color';
+    	     $field['Icon']='ico';
+    	     $field['Pos']='pos';
+    	     $field['ClassId']='id';
+    	     $classType = M('prd_class')->where(array('IsDelete'=>0, 'IsUse'=>1))->field($field)->order('OrderId asc')->select();
+    	     
+    	     $location = send_curl('http://localhost/'.C('TP_PROJECT_WEXIN').'/index.php/Api/getlocation', array('openid'=>$this->_openid));
+    	     $location = json_decode($location,true); 
+    	     
+    	     $city = M('cut_customer_city')->where(array('Uid'=>$uid))->find()['Cityid'];
+    	     if($city) {
+    	     	$param['CityId'] = $city;
+    	     }else{
+    	     	$param['CityId'] = $this->_city_id == 0 ? 1 : $this->_city_id;	//城市id
+    	     }
+    	     
+    	     $param['PlatformId']=0;   //微信的平台ID
+             $param['Sorting']=1;      //排序方式 2为正序 1为倒叙
+             $param['ClassType']=0;    //分类 0热门 1 电脑类 2手机类
+             $param['limit']=6;        //分页
+             $param['page']=1;         //分页
+             
+             $module=A('Api')->getProductList($param);
+             
+             $this->assign('classType', $classType);
+             $this->assign('module',$module['data']);
+             $this->assign('location',$location);
+             $this->assign('pagename','XXXXX-首页');
+             
+             $this->display('qcs_index_new');
       }
 }
