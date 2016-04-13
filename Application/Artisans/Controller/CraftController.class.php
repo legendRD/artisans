@@ -434,4 +434,25 @@ class CraftController extends CommonController {
 	     
 	     $this->display('qcs_status2');
       }
+      
+      //取消订单
+      public function cancel_ajax() {
+      	     $post_data	= I('post.');
+	     $order_id	= $post_data['id'];
+	     $uid	= $post_data['uid'];
+	     if(!$uid) {
+	     	  return json_encode(array('status'=>300));
+	     }
+	     $cancel_data = array(
+	     	'update_type'=>100,
+	     	'order_id'=>$order_id,
+	     	'uid'=>$uid
+	     );
+	     $get_cancel_data = A('OrderApi')->updateOrder($cancel_data);
+	     if($get_cancel_data['code'] == 200 && $get_cancel_data['code']['data']) {
+	     	     return json_encode(array('status'=>200));
+	     }else{
+	     	     return json_encode(array('status'=>800));
+	     }
+      }
 }
