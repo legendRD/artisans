@@ -455,4 +455,40 @@ class CraftController extends CommonController {
 	     	     return json_encode(array('status'=>800));
 	     }
       }
+      
+      //订单状态
+      private function _getOrderStatus($param) {
+      	        $status	 = $param['status'];
+		$pay_way = $param['pay_way'];
+		switch($status) {
+			case 0:
+				if($pay_way == 1) {
+					$status	= '未支付(线下支付)';
+				}else{
+					$status	= '待支付';
+				}
+				break;
+			case 100:
+				$status	= '支付失败';
+				break;
+			case 200:
+				$status	= '订单取消';
+				break;
+			case 300:
+				$status	= '已支付-等待联系';
+				break;
+			case 400:
+				$status	= '已服务';
+				break;
+			case 500:
+				$status	= '已点评';
+				break;
+			case 600:
+				$status	= '申请退款';
+				break;
+			default:
+				$status	= '待支付';
+		}
+		return $status;
+      }
 }
