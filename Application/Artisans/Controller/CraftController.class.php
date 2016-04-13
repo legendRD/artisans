@@ -577,4 +577,46 @@ class CraftController extends CommonController {
              
              $this->display('qcs_index_new');
       }
+      
+      public function index_sub() {
+      	     $this->checkAuthGetParam()
+      	     $param['CityId'] = $this->_city_id == 0 ? 1 : $this->_city_id;	//城市ID
+      	     $param['PlatformId'] = 0;	//微信的平台ID
+      	     $param['Sorting']    = 1;  //排序方式 2为正序  1为倒序
+      	     $param['ClassType']  = $this->_get_param['class'];	//分类
+      	     $classinfo = M('prd_class')->find($this->_get_param['class']);
+      	     $module = A('Api')->getProductList($param);
+      	     
+      	     $this->assign('status', $module['status']);
+      	     $this->assign('module', $module['data']);
+      	     $this->assign('info', $classinfo);
+      	     $this->assign('openId', $this->_openid);
+      	     $this->assign('pagename', 'XXXXX-子菜单');
+      	     
+      	     $this->display('qcs_index_sub');
+      }
+      
+      public function proDetails() {
+      	     $this->checkAuthGetParam();
+      	     if ( I('get.Plat')=='app') {
+	        $param['PlatformId']=2;   //app平台
+	       	$param['CityId']=I('get.acity');       //城市ID
+	       	$param['ProductId']=I('get.ProductId');       //城市ID
+	     }else{
+        	$param['PlatformId']=0;   //微信的平台ID
+        	$param['CityId']=$this->_city_id;       //城市ID
+        	$param['ProductId']=$this->_get_param['ProductId'];       //城市ID
+	     }
+	     $module =  A('Api')->getProductInfo($param);
+	     
+	     $this->assign('description',$module['data']);
+             $this->assign('pagename','【'.$module['data']['title'].'】-产品详情页');
+             
+             $this->display('qcs_intro');
+      }
+      
+      //列表页
+      public function systemList() {
+      	
+      }
 }
