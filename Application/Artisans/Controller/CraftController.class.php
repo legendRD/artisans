@@ -527,6 +527,8 @@ class CraftController extends CommonController {
       	     		M('mnitor_visti_log')->add($add);
       	     	}
       	     }
+      	     
+      	     $this->display('qcs_guide');
       }
       
       //首页
