@@ -491,4 +491,46 @@ class CraftController extends CommonController {
 		}
 		return $status;
       }
+      
+      public function count_source($source = null) {
+      	     $string = '';
+      	     foreach($source as $key=>$vale) {
+      	     	     $string .= '/'.$key.'='.$value;
+      	     }
+      	     if($source['source']) {
+      	     	     session('source', $source['source']);
+      	     }
+      	     if(session('source')) {
+	      	     	$source=array(
+	                'source_value'=>session('source'),
+	                'source_link'=>D('Api')->clear_urlcan($_SERVER['HTTP_REFERER']),
+	                'ip'=>$_SERVER['REMOTE_ADDR'],
+	                'udate'=>time(),
+	                'page'=>ACTION_NAME,
+	                'type'=>'weixin',
+	                'usrid'=>$this->_openid,
+	                'now_url'=>$string,
+	            );
+	            M('mnitor_source')->add($source);
+      	     }
+      }
+      
+      //引导页
+      public function guide() {
+      	     $this->checkAuthGetParam();
+      	     $uid = $this->_usercenter_uid;
+      	     if($uid) {
+      	     	$status = M('mnitor_visit_log')->where(array('Uid'=>$uid))->find();
+      	     	if(!$status) {
+      	     		$add['time'] = date('Y-m-d H:i:s');
+      	     		$add['Uid']  = $uid;
+      	     		M('mnitor_visti_log')->add($add);
+      	     	}
+      	     }
+      }
+      
+      //首页
+      public function index() {
+      	
+      }
 }
