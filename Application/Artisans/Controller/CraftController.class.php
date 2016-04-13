@@ -393,6 +393,7 @@ class CraftController extends CommonController {
       	     
       	     //获取产品关键步骤
       	     $get_step_data = array('pro_id'=>$order_info['pro_id'], 'order_id'=>$order_id);
-      	     $step_info     = A('Api')->getProductStep($)
+      	     $step_info     = A('Api')->getProductStep($get_step_data);
+      	     $order_step    = $step_info['data']['order_step'] ? $step_i
       }
 }
