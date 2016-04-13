@@ -394,6 +394,44 @@ class CraftController extends CommonController {
       	     //获取产品关键步骤
       	     $get_step_data = array('pro_id'=>$order_info['pro_id'], 'order_id'=>$order_id);
       	     $step_info     = A('Api')->getProductStep($get_step_data);
-      	     $order_step    = $step_info['data']['order_step'] ? $step_i
+      	     $order_step    = $step_info['data']['order_step'] ? $step_info['data']['order_step'] : array();
+      	     $pro_step	    = $step_info['data']['pro_step'] ? $step_info['data']['pro_step'] : array();
+      	     foreach($order_step as $value) {
+      	     	     $order_step_s[$value['StepId']] = $value;
+      	     }
+      	     foreach($pro_step as &$val) {
+      	     	     if($order_step_s[$val['step_id']['State']==='0') {
+      	     	     	              $val['status'] = 100;
+      	     	     	              $val['create_time'] = $order_step_s[$val['step_id']]['CreaterTime'];
+      	     	     }elseif($order_step_s[$val['step_id']]['State']==='1') {
+      	     	     		      $val['status'] = 200;
+      	     	     		      $val['create_time'] = $order_step_s[$val['step_id']]['CreaterTime'];
+      	     	     }else{
+      	     	     		      $val['status'] = 300;
+      	     	     		      $val['create_time'] = '';
+      	     	     }
+      	     }
+      	     
+      	     //取消预约按钮显示状态：
+      	     //I.订单状态
+      	     //II.关键步骤一条记录没有
+      	     if(($order_info['status'] == 300 || ($order_info['pay_way'] == 1 && $order_info['status'] == 0)) && count($order_step) == 0 && $user_role == 'user'){
+      	     	 $cancle_status	= 'yes';
+      	     }else{
+      	     	 $cancle_status	= 'no';
+      	     }
+      	     if($order_info['status'] == 200) {
+      	     	 $user_role	= 'craft';
+      	     }
+      	     
+      	     $this->assign('user_role',$user_role);//用户角色
+	     $this->assign('cancle_status',$cancle_status);	//取消按钮
+	     $this->assign('pro_step',$pro_step); //产品步骤
+	     $this->assign('openid',$openid);
+	     $this->assign('order_info',$order_info); //订单消息
+	     $this->assign('uid',$uid); //订单消息
+	     $this->assign('pagename','XXXXX-更新状态页');
+	     
+	     $this->display('qcs_status2');
       }
 }
