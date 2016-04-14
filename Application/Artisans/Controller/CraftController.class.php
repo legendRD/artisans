@@ -617,6 +617,38 @@ class CraftController extends CommonController {
       
       //列表页
       public function systemList() {
-      	
+      	     $this->checkAuthGetParam();
+      	     $getData      =   $this->_get_param;
+      	     if($this->_city_id != $getData['city'] && in_array($getData['city'], $this->_city_list)) {
+      	     	       $this->_city_id = $getData['city'];
+      	     }
+      	     $param['ProductId']= $getData['ProductId'];
+             $param['Capacity'] = $getData['day'];
+             $param['TimeId']   = $getData['time'];  //时间Id
+             $param['City']     = $getData['city'];  //时间Id
+             $param['lng']      = $getData['lng'];       //经纬度
+             $param['lat']      = $getData['lat'];       //经纬度
+             $param['page']     = 1;        //当前页
+             $param['limit']    = 5;       //一页的数据量
+             $param['Distance'] = 'asc';    //距离
+             $param['goodRate'] = 'asc';
+             $stemList = A('Api')->getCraftsManList($param);
+             if($stemList['data'][0]['Distance']>40 || $stemList['data'] == null) {
+             	         header("location:submitUserinfo.html?pro_id={$getData['ProductId]}&address={$getData['address]}&lat={$getData['lat']}&lng={$getData['lng']}&order_date={$getData['day']}&order_time_id={$getData['time']}&for_who={$getData['type']}&city_id={$param['city']}&pay_process=4");
+             }
+             
+             $info['ProductId']  = $getData['ProductId'];
+             $info['CityId']     = $getData['city'];
+             $info['PlatformId'] = 0;
+             $product = A('Api')->getProductInfo($info);
+             $price   = $product['data']['Price'];
+             
+             $this->assign('price', $price);
+             $this->assign('stemList', $stemList);
+             $this->assign('get', $getData);
+             $this->assign('pageHome', 'craftSystemList');
+             $this->assign('pagename', 'XXXXX-列表页');
+             
+             $this->display('qcs_list_spa');
       }
 }
