@@ -651,4 +651,163 @@ class CraftController extends CommonController {
              
              $this->display('qcs_list_spa');
       }
+      
+      public function engineer() {
+      	     $this->checkAuthGetParam();
+      	     $info_id = $this->_get_param['info_id'];
+      	     $info = M('ord_submit_info')->where(array('InfoId'=>$info_id))->find();
+      	     $param['ProductId'] = $info['ProductId'];
+      	     $param['Capacity']  = $info['OrderDate'];
+      	     $param['TimeId']    = $info['OrderTimeId'];	//时间Id
+      	     $param['City']      = $info['CityName'];
+      	     $param['lng']	 = $info['Lng'];		//经度
+      	     $param['lat']	 = $info['Lat'];		//纬度
+      	     $param['Distance']  = 'asc';			//距离
+      	     $param['goodRate']  = 'asc';
+      	     $stemList = A('Api')->getCraftsManList($param);
+      	     if($stemList['data'][0]['Distance']>40||$stemList['data'] == null) {
+      	     	         header("location:selectCard.html?info_id={$getData['info_id']}&crt_id=9999&pay_process=4");
+      	     }
+      	     $info['ProductId']  = $info['ProductId'];
+      	     $info['CityId']     = $info['CityName'];
+      	     $info['PlatformId'] = 0;
+      	     $product = A('Api')->getProductInfo($info);
+      	     $price   = $product['data']['Price'];
+      	     foreach($stemList['data'] as $k => $v) {
+      	     	     $stemList['data'][$k]['proPrice'] = $price;
+      	     }
+      	     $stemList = json_encode($stemList);
+      	     $this->assign('stemList', $stemList);
+      	     $this->assign('get', $getData);
+      	     $this->display('qcs_engineer');
+      }
+      
+      //ajax列表页
+      public function ajsystemList($pagedata=null) {
+      	     $postData = I('post.');
+      	     
+      	     $param['Capacity']  = $postData['day'];
+      	     $param['ProductId'] = $postData['product_id'];
+      	     $param['TimeId']    = $postData['time'];		//时间Id
+      	     $param['lat']	 = $postData['lat'];
+      	     $param['lng'] 	 = $postData['lng'];
+      	     $param['page']      = $postData['page'];
+      	     $param['limit']     = $postData['limit'];
+      	     $param['City']	 = $postData['city'];
+      	     
+      	     if($postData['type'] == 0) {
+      	     	     //按距离 好评率
+      	     	     $param['Distance']   = 'asc';	//距离
+      	     	     $param['serviceNum'] = 'desc';
+      	     	     $param['goodRate']   = 'desc';
+      	     }elseif($postData['type'] == 1) {
+      	     	     //按人气 好评率
+      	     	     $param['Distance']   = 'asc';	//距离
+      	     	     $param['serviceNum'] = 'desc';
+      	     	     $param['goodRate']   = 'desc';
+      	     }elseif($postData['type'] == 2) {
+      	     	     $param['serviceNum'] = 'desc';
+      	     	     $param['goodRate']   = 'desc';
+      	     }elseif($postData['type'] == 3) {
+      	     	     $param['Distance']   = 'asc';
+      	     }
+      	     $stemList = A('Api')->getCraftsManList($param);
+      	     return json_encode($stemList);
+      }
+      
+      public function systemDetail() {
+      	     $this->checkAuthGetParam();
+      	     $getData = $this->_get_param;
+      	     
+      	     $param['CraftsmanId'] = $getData['CraftsmanId'];
+      	     $param['lng']	   = $getData['lng'];
+      	     $param['lat']	   = $getData['lat'];
+      	     $CraftsInfo = A('Api')->getCraftsManInfo($param);
+      	     
+      	     $prd_param['ProductId']  = $getData['ProductId'];
+      	     $prd_param['CityId']     = $this->_city_id;
+      	     $prd_param['PlatformId'] = 0;
+      	     $productInfo = A('Api')->getProductInfo($prd_param);
+      	     $date_arr = $this->showweek();
+      	     
+      	     $time_s = array('10:00'=>1, '11:00'=>14, '12:00'=>15, '13:00'=>16, '14:00'=>2, '15:00'=>17, '16:00'=>18, '17:00'=>19, '18:00'=>3, '19:00'=>20, '20:00'=>21, '21:00'=>22);
+      	     $j      = 0;
+      	     foreach($date_arr as $value) {
+      	     	  if($value['date'] == $getData['day']) {
+      	     	  	break;
+      	     	  }
+      	     	  $j++;
+      	     }
+      	     $i = 0;
+      	     foreach($time_s as $v) {
+      	     	if($v = $getData['time']) {
+      	     		break;
+      	     	}
+      	     	$i++;
+      	     }
+      	     $CraftsInfo['data']['disPrice'] = ceil($CraftsInfo['data']['Distance']*2);
+      	     
+      	     $this->assign('index',$i);
+ 	     $this->assign('index_day',$j);
+             $this->assign('date_arr',json_encode($date_arr));
+             $this->assign('time_arr',json_encode($time_s));
+             $this->assign('ProductInfo', $ProductInfo['data']);
+             $this->assign('CraftsInfo', $CraftsInfo['data']);
+             $this->assign('pageHome','craftDetail');
+             $this->assign('pagename','XXXXX-手艺人信息页');
+            
+             $this->display('qcs_detail');
+      }
+      
+      public function new_dt() {
+      	     $this->checkAuthGetParam();
+      	     $param['PlatformId'] = 0;	//微信的平台ID
+      	     $param['CityId']     = $this->_city_id;	//城市ID
+      	     $param['ProductId']  = $this->_get_param['ProductId'];	//城市ID
+      	     $ClassType = M('prd_product_platform_city')->where($param)->getField('ClassType');
+      	     $module = A('Api')->getProductInfo($param);
+      	     if($ClassType == 0) {
+      	     	   $module['data']['BannerImgUrl']    = $module['data']['headImg'];
+      	     	   $module['data']['BannerImgCdnUrl'] = $module['data']['headImg_cdn']; 
+      	     }
+      	     $date_arr = $this->showweek();
+      	     $time_s = array('10:00'=>1, '11:00'=>14, '12:00'=>15, '13:00'=>16, '14:00'=>2, '15:00'=>17, '16:00'=>18, '17:00'=>19, '18:00'=>3, '19:00'=>20, '20:00'=>21, '21:00'=>22);
+      	     
+      	     $this->assign('date_arr',json_encode($date_arr));
+             $this->assign('time_arr',json_encode($time_s));
+             $this->assign('description',$module['data']);
+             $this->assign('pagename','XXXXX-选时间页');
+             
+             $this->display('qcs_creat_order');
+      }
+      
+      public function dt() {
+      	     $this->checkAuthGetParam();
+             $param['PlatformId']=0;   //微信的平台ID
+             $param['CityId']=$this->_city_id;       //城市ID
+             $param['ProductId']=$this->_get_param['ProductId'];       //城市ID
+             
+             $module=A('Api')->getProductInfo($param);
+             $date_arr = $this->showweek();
+             $time_s = array('10:00'=>1, '11:00'=>14, '12:00'=>15, '13:00'=>16, '14:00'=>2, '15:00'=>17, '16:00'=>18, '17:00'=>19, '18:00'=>3, '19:00'=>20, '20:00'=>21, '21:00'=>22);
+             
+             $this->assign('date_arr',json_encode($date_arr));
+             $this->assign('time_arr',json_encode($time_s));
+             $this->assign('description',$module['data']);
+             $this->assign('pagename','XXXXX-选时间页');
+             
+             $this->display('qcs_dt');
+      }
+      
+      //显示日期， 显示最近12天
+      public function showweek() {
+      	     $week_arr = array("日","一","二","三","四","五","六");
+      	     for($i=0;$i<12;$i++) {
+      	     	 $tmp_time = time+86400*$i;
+      	     	 $tmp['date'] = date('Y-m-d', $tmp_time);
+      	     	 $tmp['week'] = '周',$week_arr[date('w', $tmp_time)];
+      	     	 $date_arr[] = $tmp;
+      	     }
+      	     return $date_arr;
+      }
 }
