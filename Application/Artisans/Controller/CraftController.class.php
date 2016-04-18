@@ -810,4 +810,127 @@ class CraftController extends CommonController {
       	     }
       	     return $date_arr;
       }
+      
+      public function ajProductList() {
+      	     $city = I('param.city');
+      	     
+      	     $param['PlatformId'] = 0;		//微信的平台ID
+      	     $param['CityId']     = $city;	//城市ID
+      	     $param['Sorting']    = 1;		//排序方式 2为正序 1为倒序
+      	     $param['ClassType']  = 0;		//分类 0热门 1电脑类 2手机类
+      	     $param['limit']      = 6;		//分页
+      	     $param['page']	  = 1;		//分页
+      	     
+      	     $module = A('Api')->getProductList($param);
+      	     if($module['status'] == 200) {
+      	     	       foreach($module['data'] as $k=>$v) {
+      	     	       	       $module['data'][$k]['detailHref'] = 'proDetail/ProductId/'.$module['data'][$k]['ProductId'];
+      	     	       	       if($module['data'][$k]['prdtype'] == 1) {
+      	     	       	       	         $module['data'][$k]['dtHref'] = 'proDetail/ProductId/'.$module['data'][$k]['ProductId'];
+      	     	       	       }else{
+      	     	       	       	         $module['data'][$k]['dtHref'] = 'new_dt/ProductId/'.$module['data'][$k]['ProductId'];
+      	     	       	       }
+      	     	       }
+      	     }
+      	     return json_encode($module);
+      }
+      
+      public function setCity() {
+      	     $city_id = I('post.city');
+      	     $uid     = I('post.uid');
+      	     if(in_array($city_id, $this->_city_list)) {
+      	     	
+      	     	//缓存或添加数据
+      	          $data['Uid']    = $uid;
+      	     	  $data['CityId'] = $city_id;
+      	     	  $data['CrtaterTime'] = date('Y-m-d H:i:s');
+      	     	  
+      	     	  $res = M('cut_customer_city')->where(array('Uid'=>$data['Uid']))->find();
+      	     	  if($res) {
+      	     	  	$res = M('cut_customer_city')->where(array('Uid'=>$data['Uid']))->save($data);
+      	     	  }else{
+      	     	  	M('cut_customer_city')->add($data);
+      	     	  }
+      	     	  
+      	     	  $return['res']   = $res;
+      	     	  $return['data']  = $data;
+      	     	  $return['status'] = 200;
+      	     }else{
+      	     	  $return['status'] = 300;
+      	     }
+      	     return json_encode($return);
+      }
+      
+      public function capacityByCityProIdDate() {
+      	     $postData = I('param.');
+      	     $param['CityId']    = $postData['city_id'];
+      	     $param['ProductId'] = $postData['product_id'];
+      	     $param['Date']      = date('Y-m-d', strtotime($postData['date']));
+      	     
+      	     $data = A('Api')->capacityByCityProIdDate($param);
+      	     $this->ajaxReturn($data);
+      }
+      
+      public function capacityByuserIdDate() {
+      	     $postData=I('post.');
+    	     $param['CraftsmanId']=$postData['userId']; //手艺人id
+    	     $param['Date']=$postData['time'];   //日期
+    	     $param['ProductId']=$postData['productId'];   //日期
+
+             $data=A('Api')->capacityByCityProIdDate($param);
+    	     json_return($data);
+      }
+      
+      //前端异步监控提交接口
+      public function FrontMonitor() {
+      	     //usrid:_id, //用户标识
+      	     //time:_t,   //点击时间
+      	     //content:_v,  //点击内容
+      	     //position:_p, //点击位置
+      	     //zoon:_z,    //点击所属区域
+      	     //page:_page, //点击所属页面
+      	     //from:_from  //上一页面
+      	     //type:weixin //微信平台
+      	     $data = I('get.');
+      	     $data['content'] = strip_tags(urldecode($data['content']));
+      	     $data['from']    = strip_tags(urldecode(D('Api')->clear_urlcan($data['from'])));
+      	     $data['ip']      = $_SERVER['REMOTE_ADDR'];
+      	     $data['type']    = 'weixin';
+      	     M('mnitor_pcmnitor')->add($data);
+      }
+      
+      //操作关键步骤 ajax
+      public function qcsstatusajax2() {
+      	     $post_data = I('post.');
+      	     $order_id  = $post_data['id'];
+      	     $status    = $post_data['status'];	//关键步骤行为：‘yes' or ’no'
+      	     $step_id   = $post_data['option']; //关键步骤id
+      	     $openid    = $post_data['openid']; //openid
+      	     $crafts_username = $post_data['username'];	//XXX用户名
+      	     $nick_name       = $post_data['name'];	//用户姓名
+      	     
+      	     $order_step_data['order_id']    = $order_id;
+      	     $order_step_data['step_id']     = $step_id;
+      	     $order_step_data['step_status'] = $status == 'yes' ? 100:200;
+      	     $order_step = A('OrderApi')->updateOrderStep($order_step_data);
+      	     wlog('/share/weixinLog/artisans/user_center_api/send_dianping_'.date('ymd').'.log', $order_step);	//点评接口日志
+      	     if($order_step['code'] == 200 && $order_step['data']['step_info']) {
+      	     	    if($order_step['data']['status'] == 'yes') {
+      	     	    		//推送点评 
+      	     	    		$data	= array(
+					"source"      => 800,
+					"openid"      => $openid,
+					"username"    => $craft_username,
+					"create_time" => date('Y-m-d H:i:s'),
+					"nick_name"   => $nick_name,
+					"caseid"      => $order_id
+				);
+				wlog('/share/weixinLog/artisans/user_center_api/send_dianping_'.date('ymd').'.log', $data); 	//点评接口日志
+				$this->adddianping($data);
+				return json_encode(array('status'=>200, 'time'=>$order_step['data']['create_time']));
+      	     	    }else{
+      	     	    		return json_encode(array('status'=>0));
+      	     	    }
+      	     }
+        }
 }
