@@ -805,7 +805,7 @@ class CraftController extends CommonController {
       	     for($i=0;$i<12;$i++) {
       	     	 $tmp_time = time+86400*$i;
       	     	 $tmp['date'] = date('Y-m-d', $tmp_time);
-      	     	 $tmp['week'] = '周',$week_arr[date('w', $tmp_time)];
+      	     	 $tmp['week'] = '周'.$week_arr[date('w', $tmp_time)];
       	     	 $date_arr[] = $tmp;
       	     }
       	     return $date_arr;
