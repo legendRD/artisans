@@ -933,4 +933,67 @@ class CraftController extends CommonController {
       	     	    }
       	     }
         }
+        
+        //附加点评数据
+        public function adddianping($data) {
+        	$add_dianping = C('postdianpingdata');
+        	wlog('/share/weixinLog/artisans/user_center_api/send_dianping_'.date('ymd').'.log', $add_dianping);	//点评接口日志
+        	$json = jsone_decode(send_curl($add_dianping, $data), true);
+        	wlog('/share/weixinLog/aritsans/user_center_api/send_dianping_'.date('ymd').'.log', $json);
+        	
+        	//200：成功并发送点评消息
+        	if($json['code']==200) {
+        		$content = array(
+        			'title'=>'点击为TA评价',
+        			'description'=>'XXXXXXX为您提供的服务，您还满意吗？请为Ta进行点评',
+        			'url'=>'http://localhost/valuation/index.php/tel/index.html?uid='.$data['openid'].'&time='.strtotime($data['create_time']),
+        			'picurl'=>'http://localhost/weixin/link/dianping1.jpg'
+        		);
+        		$data['recordid'] = $json['msg'];
+        		M('ord_record')->add($data);
+        		$param['openid'] = $data['openid'];
+        		$param['type']   = 'news';
+        		$param['content']= $content;
+        		$return_data = D('WeiXinApi')->sendWxMsg($param);
+        		wlog('/share/weixinLog/artisans/user_center_api/send_dianping_'.date('ymd').'.log', $return_data);
+        		return 200;
+        	}else{
+        		return $json['code'];
+        	}
+        }
+        
+        public function getEvaluationList() {
+        	$postData = I('post.');
+        	$param['CraftsmanId'] = $postData['userId'];	//手艺人id
+        	$param['page']        = $postData['page'];
+        	$param['limit']       = $postData['limit'];
+        	$data = A('Api')->getEvaluationList($param);
+        	return json_encode($data);
+        }
+        
+        public function simplePay() {
+        	$this->checkAuthGetParam();
+        	$p_type = $this->_get_param['p_type'];	//商品编号
+        	$this->_get_param['openid'] = $this->_openid;
+        	$this->_get_param['uid']    = $this->_usercenter_uid;
+        	
+        	//支付需要的参数
+        	$conf['appid']      = C('APPID');
+        	$conf['partnerkey'] = C('PARTNERKEY');
+        	$conf['partnerid']  = C('PARTNERID');
+        	$conf['appkey']     = C('PAYSIGNKEY');
+        	
+        	//商品价格
+        	$daogou_data['p_type'] = $p_type;
+        	$daogou_info           = A('OrderApi')->getDaogou($daogou_data);
+        	$price  	       = $daogou_info['data']['shop_price'];
+        	
+        	$this->assign('conf', $conf);
+        	$this->assign('price', $price);
+        	$this->assign('get_param', $this->_get_param);
+        	$this->assign('order_window_status',200);
+        	$this->assign('pagename','XXXXX-客服支付页');
+        	
+        	$this->display('simple_pay');
+        }
 }
