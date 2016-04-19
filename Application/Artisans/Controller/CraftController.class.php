@@ -1061,6 +1061,105 @@ class CraftController extends CommonController {
     		$conf['partnerid']  = C("PARTNERID");
     		$conf['appkey'] = C("PAYSIGNKEY");
     		
+    		$pro_info['price']			= $price;
+    		$pro_info['name']			= $product_info['data']['name'];
+    	      //$pro_info['effect_time']	        = '1年';
+    	      //$pro_info['use_times']		        = '1次';
+    	        $pro_info['effect_time']	        = $product_info['data']['remoteEffectDate'];
+    	        $pro_info['use_times']		        = $product_info['data']['remoteUseTimes'];
+    	        $pro_info['pro_id']			= $pro_id;
+    	        
+    	        $this->assign('conf',$conf);
+    		$this->assign('pro_info',$pro_info);
+    		$this->assign('order_window_status',200);
+    		$this->assign('openid',$openid);
+    		$this->assign('uid',$uid);
+    		$this->assign('city_id',$city_id);
     		
+    		$this->display('qcs_sbmit_order_yc');
+        }
+        
+        //远程服务创建订单
+        public function yCreateOrder() {
+        	$post_data	= I('post.');
+	    	$openid		= $post_data['openid'];
+	    	$uid		= $post_data['uid'];
+	    	$pro_id		= $post_data['pro_id'];
+	    	$phone		= $post_data['phone'];
+	    	$city_id	= $post_data['city_id'];
+	    	
+	    	if(!($pro_id && $phone)) {
+	    		return json_encode(array('status'=>300,'message'=>'提交失败'));
+	    	}
+	    	if(!($openid && $uid)) {
+	    		return json_encode(array('status'=>100,'message'=>'提交失败'));
+	    	}
+	    	
+	    	$data['pay_process']		= 3; //远程服务
+	    	$data['pay_way']		= 2; //微信系统微信支付
+	    	$data['user_id']		= $uid;
+	    	$data['openid']			= $openid;
+	    	$data['ip']			= get_client_ip();
+	    	$data['for_who']		= 100;
+	    	$data['pro_id']			= $pro_id;
+	    	$data['city_id']		= $city_id;
+	    	$data['source_from']		= 100;
+	    	$data['phone']			= $phone;
+	    	$data['index_source']		= session('source');
+	    	
+	    	$create_info	= A('OrderApi')->createOrder($data);
+	    	if($create_info['code'] == 200 && $create_info['data']) {
+	    		return json_encode(array('status'=>200, 'data'=>$create_info['data']));
+	    	}else{
+	    		return json_encode(array('status'=>0, 'message'=>$create_info['message']));
+	    	}
+        }
+        
+        //报名页
+        public function apply() {
+        	$this->checkAuthGetParam();
+        	$this->share_url = 'http://localhost/'.C('TP_PROJECT_NAME').'/index.php/PlanRepair/index';
+        	$this->imgUrl = 'http://localhost/'.C('TP_PROJECT_NAME').'Public/Images/PlanRepair/share.jpg';
+        	
+        	$this->assign('user_id',$this->_openid);
+                $this->assign('pagename','XXXXX-报名成为XXX页');
+                
+                $this->display('qcs_applay');
+        }
+        
+        public function ajapply() {
+        	$postData = I('post.');
+	        $data['Email']=$postData['email'];
+	        $data['OpenId'] =$postData['openid'];
+	        $data['Name'] = $postData['name'];
+	        $data['Phone'] = $postData['phone'];
+	        $data['Description'] = $postData['content'];
+	        $data['Status'] = 0;
+	        $data['CreaterTime'] = date('Y-m-d H:i:s');
+	        $data['Idea']=$postData['idea'];
+	        
+	        $id = M('crt_craftsmaninapply')->add($data);
+	        if($id) {
+	        	$return_data = array('status'=>200);
+	        }else{
+	        	$return_data = array('status'=>0);
+	        }
+	        return json_encode($return_data);
+        }
+        
+        //调研的方法
+        public function surveyNew() {
+               $this->checkAuthGetParam();
+               
+               //筛选从数据库中取出可以显示的问题
+               $model = M('prd_question')->where(array('displayStatus'=>1))->select();
+               
+               // 分配到模板变量中去
+               $this->assign('openId',$this->_openid);
+               $this->assign('question',$model);
+               
+               // 显示模板页面
+               $this->assign('pagename','XXXXX-下一个服务你来定');
+               $this->display('qcs_survey');
         }
 }
