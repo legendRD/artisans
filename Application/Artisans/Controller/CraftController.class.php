@@ -996,4 +996,71 @@ class CraftController extends CommonController {
         	
         	$this->display('simple_pay');
         }
+        
+        //客服导购创建订单
+        public function cCreateOrder() {
+        	$post_data	= I('post.');
+	    	$openid		= $post_data['openid'];
+	    	$uid		= $post_data['uid'];
+	    	$p_type		= $post_data['p_type'];
+	    	$p_from		= $post_data['p_from'];
+	    	
+	    	if(!($openid && $uid)) {
+	    		return json_encode(array('status'=>100, 'message'=>'提交失败'));
+	    	}
+	    	
+	    	$data['pay_process']	= 2; //客服导购
+	    	$data['pay_way']	= 2; //微信系统微信支付
+	    	$data['user_id']	= $uid;
+	    	$data['openid']		= $openid;
+	    	$data['package_id']	= 0;
+	    	$data['ip']		= get_client_ip();
+	    	$data['for_who']	= 100;
+	    	$data['enginner_name']	= $p_from;
+	    	$data['pro_id']		= $p_type;
+	    	$data['city_id']	= 1;
+	    	$data['source_from']	= 100;
+	    	$data['index_source']	= session('source');
+	    	
+	    	$create_info = A('OrderApi')->createOrder($data);
+	    	
+	    	if($create_info['code'] == 200 && $create_info['data']) {
+	    		return json_encode(array('status'=>200, 'data'=>$create_info['data']));
+	    	}else{
+	    		return json_encode(array('status'=>0, 'message'=>$create_info['message']));
+	    	}
+        }
+        
+        //远程服务
+        public function expertService() {
+        	$this->checkAuthGetParam();
+        	$pro_id  = $this->_get_param['pro_id'];
+        	$city_id = $this->_get_param['city_id'];
+        	$uid     = $this->_usercenter_uid;
+        	$openid  = $this->_openid;
+        	
+        	//获取产品信息
+        	$transfer_data = array(
+        		'PlatformId'=>0,
+    			'CityId'=>$city_id,
+    			'ProductId'=>$pro_id
+        	);
+        	$product_info	= A('Api')->getProductInfo($transfer_data);
+        	
+        	if($product_info['data']['promotion']) {
+	    		$price	= $product_info['data']['promotion']['endPrice'];
+	    	}else{
+	    		$price	= $product_info['data']['Price'];
+	    	}
+	    	
+	    	$price	= $price>0? $price:200;
+	    	
+	    	//支付需要的参数
+    		$conf['appid']  = C("APPID");
+    		$conf['partnerkey'] = C("PARTNERKEY");
+    		$conf['partnerid']  = C("PARTNERID");
+    		$conf['appkey'] = C("PAYSIGNKEY");
+    		
+    		
+        }
 }
