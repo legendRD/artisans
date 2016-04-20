@@ -1162,4 +1162,31 @@ class CraftController extends CommonController {
                $this->assign('pagename','XXXXX-下一个服务你来定');
                $this->display('qcs_survey');
         }
+        
+        //调研提交表单的方法
+        public function survey_submit() {
+        	//获取表单提交的数据
+        	//获取问题id的数组
+        	$data = I('post.select');
+        	//获取电话号
+        	$insert['phone']  = I('post.telephone');
+        	//获取用户的openId
+        	$insert['openId'] = I('post.openId');
+        	//获取用户的其他信息
+        	$insert['other']  = I('post.other');
+        	//获取时间添加数据的时间戳
+        	$insert['createTime'] = time();
+        	//拼接表单提交的id数据
+        	$insert['questionIdStr'] = implode(',', $data);
+        	//生成一笔调查问卷数据
+        	$model = M('prd_questionnaire')->add($insert);
+        	//更新问题回答条数
+        	$model = M('prd_question')->where(array('id'=>array('in', $insert['questionIdStr'])))->setInc('countTime');
+        	if($model) {
+        		$returnData = array('status'=>200, 'msg'=>'非常感谢您，参与需求调研。');
+        	}else{
+        		$returnData = array('status'=>300, 'msg'=>'提交失败请重新提交。');
+        	}
+        	return json_encode($returnData);
+        }
 }
