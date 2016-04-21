@@ -1189,4 +1189,172 @@ class CraftController extends CommonController {
         	}
         	return json_encode($returnData);
         }
+        
+        public function sendCode() {
+        	$param['phone'] = I('post.phone');
+        	$param['type']  = 2;
+        	$data = A('Api')->SendCode($param);
+        	return json_encode($data);
+        }
+        
+        public function submit_to_order() {
+        	$post_data = I('param.');
+        	$data['ProductId']  = $post_data['pro_id'];	//产品ID
+        	$data['UserOpenid'] = $post_data['openid'];     //用户openid
+        	$data['Name']       = $post_data['name'];	//用户姓名
+        	$data['Address']    = $post_data['address'];	//地址
+        	$data['Phone']      = $post_data['phone'];	//手机号
+        	$data['OrderDate']  = $post_data['date'];	//日期
+        	$data['CreaterTime']= date('Y-m-d H:i:s');	//创建日期
+        	$date['ForWho']     = $post_data['type'];	//为谁约
+        	$data['ShortMessage'] = $post_data['remark'];	//祝福的话
+        	$data['Lat']        = $post_data['lat'];	//经度
+        	$data['Lng']	    = $post_data['lng'];	//纬度
+        	$data['CityName']   = $this->_city_list[$post_data['city']];
+        	$data['code']       = $post_data['idcode'];
+        	$data['PayProcess'] = 1;			//支付流程 1
+        	
+        	$btn[] = isset($data['ProductId'])?true:false;
+        	$btn[] = isset($data['UserOpenid'])?true:false;
+        	$btn[] = isset($data['Name'])?true:false;
+        	$btn[] = isset($data['Phone'])?true:false;
+        	$btn[] = isset($data['code'])?true:false;
+        	$btn[] = isset($data['OrderDate'])?true:false;
+        	$btn[] = isset($data['OrderTimeId'])?true:false;
+        	$btn[] = isset($data['ForWho'])?true:false;
+        	$btn[] = isset($data['Lat'])?true:false;
+        	$btn[] = isset($data['Lng'])?true:false;
+        	
+        	//验证验证码是否过期
+        	if(!in_array($false, $btn)) {
+        		if(array_key_exists($post_data['city'], $this->_city_list)) {
+        			$param['phone'] = $data['Phone'];
+				$param['code'] = $post_data['idcode'];
+				$code = A('Api')->CheckCode($param);
+				if($code['status'] == 200) {
+					if(isset($post_data['address_s'])) {
+						$data['AddressInfo'] = $post_data['address_s'];
+					}
+					$id = M('ord_submit_info')->add($data);
+					if($id) {
+					        	$return['status'] = 200;
+					        	$return['msg']    = 'success';
+					        	$return['info_id']= $id;
+					}else{
+					        	$return['status'] = 500;
+							$return['msg']    = '网络开了小差，请重试';
+					}
+				}else{
+					$return['status']=503;
+					$return['msg']='您填写的验证码有误';	
+				}
+			}else{
+				$return['status']=505;
+				$return['msg']='您选择的服务地点未开通手艺人服务';
+			}
+        	}else{
+        		$return['status']=300;
+			$return['msg']='网络开了小差，请重试';
+        	}
+        	return json_return($return, $post_data['test']);
+        }
+        
+        //是否关注
+        public function is_attention() {
+               //echo send_curl('http://localhost/'.C('TP_PROJECT_WEIXIN').'/index.php/Api/is_attention', I('param.')); 
+               echo 200;
+        }
+        
+        //在线客服
+        public function isonlinekefu() {
+        	//工程师是否在线
+        	$user_id = I('param.prodlineid');
+        	$type    = I('param.type');
+        	$hours   = date('H');
+        	
+        	if($hours<18 && $hours>=9) {
+        		$return['result'] = 200;
+        	}else{
+        		$return['result'] = 100;
+        	}
+        	
+        	return json_encode($return);
+        	//$this->ajaxReturn(array('result'=>200));
+        }
+        
+        public function createQueue() {
+        	//是否接入会话
+        	$data = I('param.');
+        	//验证用户是否在会话中 是否排队
+        	$caseon['uid']   = $data['open_id'];
+        	$caseon['marks'] = '100';
+        	$caseon = json_encode($caseon, JSON_UNESCAPED_UNICODE);
+        	
+        	$awaitinfo = send_curl('http://localhost/Await/findlocation', $caseon);
+        	$awaitinfo = json_decode($awaitinfo, true);
+        	
+        	$getone = send_curl('http://localhost/case/getone', $caseon);
+        	$getone = json_decode($getone, true);
+        	
+        	if($getone['error_code'] == 0 && $awaitinfo['error_code'] == 10010) {
+        		//进入队列
+        		// $userinfo = M('user_info')->find();
+        		$sql = "SELECT * FROM XXXweixin.'wx_user_info' WHERE ( 'user_id' = '{$data['open_id']}' ) LIMIT 1";
+        		$userinfo = M()->query($sql);
+        		
+        		$post_data['uid'] = $data['open_id'];
+        		$post_data['marks'] = '100';
+        		$post_data['awaittype'] = '200';
+        		$post_data['skill'] = 'Q701';
+        		$post_data['nicename'] = $userinfo[0]['nick_name'];
+        		$post_data['sex'] = $userinfo[0]['sex'] == '1'?'男':'女';
+        		$post_data['interface_type'] = '100';
+        		$post_data['source_info'] = $data['remark'];
+        		
+        		$post_data = json_encode($post_data, JSON_UNESCAPED_UNICODE);
+        		$return = send_curl('http://localhost/Await/queued', $post_data);
+        		$return = json_decode($return, true);
+        		if($return['error_code'] == 10000) {
+        			// $param['openid']  = $data['open_id'];
+        			// $param['msgtype'] = 'text';
+        			// $param['message'] = '您好，您已进入排队中。\n菜单上还有好玩的东东,记得戳一下试试哦O(∩_∩)O';
+        			// $msg = send_curl('http://localhost/message/send_wxmsg', $param);
+        			$return['success'] = true;
+        		}else{
+        			// $param['openid']  = $data['open_id'];
+        			// $param['msgtype'] = 'text';
+        			// $param['message'] = '您好，您已进入排队中。\n菜单上还有好玩的东东,记得戳一下试试哦O(∩_∩)O';
+        			// $msg = send_curl('http://localhost/message/send_wxmsg', $param);
+        			$return['success'] = false;
+        		}
+        	}elseif($getone['error_code']!=0) {
+        		$param['openid']	=  $Data['open_id'];
+			$param['msgtype']	= 'text';
+			$param['message']	= "您好，你已经在会话中哦 O(∩_∩)O";
+			$msg = send_curl('http://localhost/message/send_wxmsg', $param);
+			$return['success']      = false;
+        	}elseif($awaitinfo['error_code'] == 10000) {
+        		//设置用户当前动作
+        		$set['uid'] = $Data['open_id'];
+        		$set['handle'] = 'manualservice';
+        		send_curl('http://localhost/message/send_wxmsg', $set);
+        		$param['openid']	=  $data['open_id'];
+			$param['msgtype']	= 'text';
+			$param['message']	= "欢迎体验XXX服务，正在为您接通手艺人客服，请稍等";
+        	}
+        	return json_encode($return);	
+        }
+        
+        public function orderpay() {
+        	$this->display('qcs_pay_order');
+        }
+        
+        //58跳转地址
+        public function qcsIndexActivity() {
+        	$this->checkAuthGetParam();
+        	$uid = $this->_usercenter_uid;
+        	$openid = $this->_openid;
+        	
+        	$location = send_curl('http://localhost/.C('TP_PROJECT_WEIXIN').'/index.php/Api/getlocation', array('openid'=>$this->_openid));
+        }
 }
