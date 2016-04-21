@@ -1355,6 +1355,167 @@ class CraftController extends CommonController {
         	$uid = $this->_usercenter_uid;
         	$openid = $this->_openid;
         	
-        	$location = send_curl('http://localhost/.C('TP_PROJECT_WEIXIN').'/index.php/Api/getlocation', array('openid'=>$this->_openid));
+        	$location = send_curl('http://localhost/'.C('TP_PROJECT_WEIXIN').'/index.php/Api/getlocation', array('openid'=>$this->_openid));
+        	$location = json_decode($location, true);
+        	
+        	$param['CityId'] = $this->_city_id;
+        	$param['PlatformId'] = 0;	//微信的平台ID
+        	$param['Sorting']    = 1;	//排序方式 2为正序 1为倒序
+        	$param['pro_id_s']   = '6,8,9';
+        	
+        	$module = A('Api')->getProductList($param);
+        }
+        
+        public function selectCard() {
+        	$this->checkAuthGetParam();
+        	$openid = $this->_openid;
+        	$uid    = $this->_usercenter_uid;
+        	$this->_get_param['openid'] = $openid;
+        	$this->_get_param['uid']    = $uid;
+        	$info   = M('ord_submit_info')->where("UserOpenid='%s'", $openid)->order('InfoId desc')->find();
+        	$this->_get_param['city_id']  = $city_id  = $info['CityName'];
+        	$this->_get_param['pro_id']   = $pro_id   = $info['ProductId'];	//产品id
+        	$this->_get_param['craft_id'] = $craft_id = $this->_get_param['crt_id'];	//XXXid
+        	$this->_get_param['address']  = $info['Address'].'('.$info['AddressInfo'].')';
+        	$this->_get_param['address_info'] = $info['Address'];
+        	$this->_get_param['lat'] = $lat = $info['Lat'];
+        	$this->_get_param['lng'] = $lng = $info['Lng'];
+        	$this->_get_param['order_date'] = $info['OrderDate'];	//预约日期
+        	$this->_get_param['order_time_id'] = $info['OrderTimeId'];	//时间Id
+        	$this->_get_param['for_who'] = $info['ForWho'];		//100为自己， 200为朋友
+        	$this->_get_param['wish']    = $info['ShortMessage'];
+        	$this->_get_param['name']    = $info['Name'];
+        	$this->_get_param['phone']   = $info['Phone'];
+        	$this->_get_param['crt_name'] = M('crt_craftsmaninfo')->where(array('CraftsmanId'=>$this->_get_param['crt_id']))->getField('TrueName');
+        	if(!$this->_get_param['pay_process']) {
+        		$this->_get_param['pay_process'] = $info['PayProcess'];
+        	}
+        	
+        	//用户选择的卡券code和卡券Id
+        	$codeid = $this->_get_param['codeid'];
+        	$cardid = $this->_get_param['cardid'];
+        	
+        	$this->_get_param['time'] = M('prd_servicetime')->where(array('TimeId'=>$this->_get_param['order_time_id']))->getField('StartTime');
+        	
+        	//api接口
+        	$transfer_data = array(
+        		'PlatformId'=>0,
+        		'CityId'=>$city_id,
+        		'ProductId'=>$pro_id
+        	);
+        	$product_info = A('Api')->getProductInfo($transfer_data);
+        	$this->_get_param['prd_name'] = $product_info['data']['title'];
+        	if($product_iofo['data']['promotion']) {
+        		$price = $product_info['data']['promotion']['endPrice'];
+        	}else{
+        		$price = $product_info['data']['Price'];
+        	}
+        	$price = $price ? $price : 120;
+        	$assign_data['price'] = $price;
+        	
+        	//支付需要的参数
+		$conf['appid']  	= C("APPID");
+		$conf['partnerkey']     = C("PARTNERKEY");
+		$conf['partnerid']      = C("PARTNERID");
+		$conf['appkey'] 	= C("PAYSIGNKEY");
+		
+		$select_regbag_url      = U('Redbag/select_redbag');	//选择卡券页
+		$assign_data['select_redbag_url'] = $select_redbag_url;
+		$craft_param = array(
+			'CraftsmanId'=>$craft_id,
+			'lat'=>$lat,
+			'lng'=>$lng
+		);
+		$craft_info = A('Api')->getCraftsManInfo($craft_param);
+		
+		//上门费 价格=公里数
+		$trave_price = ceil($craft_info['data']['Distance']*2);
+		$trave_price = $trave_price>0 ? $trave_price : 0;
+		if($trave_price > 80 || empty($craft_id)) {
+			//上门费超过80元 或者 XXX id为空
+			$trave_price = 80;
+		}
+		$assign_data['trave_price'] = $trave_price;
+		
+		//用户卡券信息
+		$card_info_data['cardid'] = $cardid;
+		$card_info_data['codeid'] = $codeid;
+		$card_info_data['openid'] = $openid;
+		
+		$pay_api_model = D('PayApi');
+		$regbag_data = $pay_api_model->getUserCardinfo($card_info_data);
+		
+		$assign_data['redbag_data'] = json_encode($redbag_data);
+		$assign_data['openid']      = $openid;
+		
+		//线上线下支付
+		if(in_array($this->_city_id, $this->_pay_offline_cityid)) {
+			$assign_data['is_below_line'] = 1;
+		}else{
+			$assign_data['is_below_line'] = 0;
+		}
+		
+		//优惠券信息
+		$coupons_info = array(
+			'source'=>1,
+			'phone' =>$this->_get_param['phone'];
+			'pro_id'=>$pro_id
+		);
+		
+		$activity_data = $pay_api_model->getUserCouponsinfo($coupons_info);
+		$assign_data['activity_data'] = json_encode($activity_data);
+		
+		$this->assign('pageHome', 'craftSelectCard');
+		$this->assign('pagename', 'XXXXX-支付页');
+		$this->assign('assign_data', $assign_data);
+		$this->assign('get_param', $this->_get_param); //get参数
+		$this->assign('order_window_status', 100);
+		$this->assign('select_redbag_url', $select_redbag_url);
+		$this->assign('conf', $conf);
+		
+		$this->display('qcs_pay_order');
+        }
+        
+        //创建订单ajax
+        public function createOrderinfo() {
+        	$postData = I('post.');
+        	$openid   = $postData['order_openid'];
+        	$uid      = $postData['order_uid'];
+        	$city_id  = $postData['order_city_id'];
+        	if(!($openid && $uid)) {
+        		return json_encode(array('status'=>100, 'message'=>'提交失败'));
+        	}
+        	$order_data['user_id'] = $uid;
+        	$order_data['pro_id']  = $pro_id   = $postData['order_pro_id'];		//产品id
+        	$order_data['craft_id']= $craft_id = $postData['order_address'];	//XXXid
+        	$order_data['lat']     = $lat      = $postData['order_lat'];
+        	$order_data['order_date']	   = $order_date    = $postData['order_date']; //预约日期
+		$order_data['order_time_id']       = $order_time_id = $postData['order_time_id']; //时间Id
+		$order_data['for_who']		   = $for_who	    = $postData['order_for_who']; //100为自己，200为朋友
+		$order_data['wish']		   = $wish	    = $postData['order_wish'];
+		$order_data['name']		   = $name	    = $postData['order_name'];
+		$order_data['phone']		   = $phone	    = $postData['order_phone'];
+		$order_data['city_id']		   = $city_id;
+		
+		//用户选择的卡券code和卡券Id
+		$order_data['order_codeid']	   = $codeid        = $postData['order_codeid'];
+		$order_data['order_cardid']	   = $cardid 	    = $postData['order_cardid'];
+		$order_data['openid']		   = $openid;
+		
+		//array(1=>'线下支付',2=>'微信系统微信支付',3=>'vmall微信支付',4=>'vmall支付宝支付');
+		$order_data['pay_way']		   = $pay_way	    = $postData['order_pay_way']==2? 2:1;
+		$order_data['source_from']         = 100;	    //订单来源【可选值100微信，200web,300安卓，400ios】
+		$order_data['pay_process']	   = $postData['order_pay_process'];	//支付流程：1正常支付，2客服引导，3客服专家在线，4.距离大于40公里支付
+		$order_data['package_id']	   = '';
+		$order_data['address_id']	   = 0;
+		$order_data['index_source']	   = session('source'); //首页来源
+		$order_data['coupons_id']	   = $postData['order_activity'];	//优惠券Id
+		
+		$create_info = A('OrderApi')->createOrder2($order_data);
+		if($create_info['code'] == 200 && $create_info['data']) {
+			return json_encode(array('status'=>200, 'data'=>$create_info['data']));
+		}else{
+			return json_encode(array('status'=>0, 'message'=>$create_info['message']));
+		}
         }
 }
