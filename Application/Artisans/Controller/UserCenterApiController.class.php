@@ -170,6 +170,202 @@ class UserCenterApiController extends CommonController {
       
       //用户注册
       public function regUser() {
-             
+             $post_data	= I('post.');
+	     $data['username']	= $username = $post_data['username'];
+	     $data['password']	= $password	= $post_data['password'];
+	     $data['source_from']= $source_from= $post_data['source_from'];	//app,web,weixin
+             $data['user_type']	= $user_type	= $post_data['user_type'];	//other
+	     $data['third_part_key']		= $user_type;	//other
+             $data['third_part_value']	= $username;	//other
+	     $reg_type	= $post_data['type'];	//注册类型，100普通用户注册，200第三方用户注册
+	     
+	     if($reg_type == 200) {
+	     	if(!($user_type && $source_from && $username)) {
+	     		$this->returnJsonData(300);
+	     	}
+	     	$hash = $this->_thirdReg($data);
+	     	wlog('/share/weixinLog/artisans/user_center_api/reguser_api_'.date('Ymd').'.log', $hash);
+	     }else{
+	     	if(!($username && $password && $source_from && $user_type)) {
+	     		$this->returnJsonData(300);
+	     	}
+	     	$hash = $this->_normalReg($data);
+	     }
+	     unset($data);
+	     if(is_array($hash) && $hash) {
+	     	$code = $hash['error_code'];
+	     	$json_data['uid'] = $hash['data']['uid'];
+	     	$json_data['username'] = $hash['data']['username'];
+	     	$this->returnJsonData($code, $json_data);
+	     }else{
+	     	$this->returnJsonData(300);
+	     }
       }
+      
+      //用户登录
+      public function loginUser() {
+      	     $post_data = I('request.');
+      	     $data['username']    = $username    = $post_data['username'];
+      	     $data['password']    = $password    = $post_data['password'];
+      	     $data['user_type']   = $user_type   = $post_data['user_type'];
+      	     $data['source_from'] = $source_from = $post_data['source_from'];
+      	     $data['third_part_key']   = $user_type;
+      	     $data['third_part_value'] = $username;
+      	     $login_type                         = $post_data['type'];	//注册类型，100普通用户，200第三方用户
+      	     if($login_type == 200){
+      	     	if(!($user_type && $source_from && $username)) {
+      	     		$this->returnJsonData(300);
+      	     	}
+      	     	$hash = $this->_thirdReg($data);
+      	     }else{
+      	     	if(!($username && $passwrod && $source_from && $user_type)) {
+      	     		$this->returnJsonData(300);
+      	     	}
+      	     	$hash = $this->_userLogin($data);
+      	     }
+      	     if(is_array($hash) && $hash) {
+      	     	$code = $hash['error_code'];
+      	     	$json_data['uid']      = $hash['data']['uid'];
+      	     	$json_data['username'] = $hash['data']['username'];
+      	     	$this->returnJsonData($code, $json_data);
+      	     }else{
+      	     	$this->returnJsonData(300);
+      	     }
+      }
+      
+      //获取用户信息
+      public function getUserInfo(){
+      	     $post_data = I('request.');
+      	     $data['uid'] = $post_data['uid'];
+      	     if(empty($data['uid'])) {
+      	     	$this->returnJsonData(300);
+      	     }
+      	     $data['access_token'] = $this->_access_token;
+      	     $post_data = json_encode($data);
+      	     unset($data);
+      	     $receive = send_curl($this->userinfo_url, $post_data);
+      	     $parse_data = json_decode($receive, true);
+      	     
+      	     if(is_array($parse_data) && $parse_data) {
+      	     	$code = $parse_data['error_code'];
+      	     	$hash = $parse_data['data'];
+      	     	$this->returnJsonData($code, $hash);
+      	     }else{
+      	     	$this->returnJsonData(500);
+      	     }
+      }
+      
+      //更新用户信息
+      public function updateUserInfo() {
+      	     $post_data = I('request.');
+      	     $data      = $post_data;
+      	     $data['uid'] = $post_data['uid'];
+      	     if(empty($data['uid'])) {
+      	     	$this->returnJsonData(300);
+      	     }
+      	     $data['access_token'] = $this->_access_token;
+      	     $post_data = json_encode($data);
+      	     unset($data);
+      	     $receive = send_curl($this->_updateinfo_url, $post_data);
+      	     $parse_data = json_decode($receive, true);
+      	     
+      	     if(is_array($parse_data) && $parse_data) {
+      	     	         $code = $parse_data['error_code'];
+      	     	         $hash = $parse_data['data'];
+      	     	         $this->returnJsonData($code, $hash);
+      	     }else{
+      	     	         $this->returnJsonData(500);
+      	     }
+      }
+      
+      //删除用户
+      public function delUserInfo() {
+      	     $post_data = I('request.');
+      	     $data = $post_data;
+      	     $data['uid'] = $post_data['uid'];
+      	     if(empty($data['uid'])) {
+      	     	$this->returnJsonData(300);
+      	     }
+      	     $data['access_token'] = $this->_access_token;
+      	     $post_data = json_encode($data);
+      	     unset($data);
+      	     $receive = send_curl($this->_deleteinfo_url, $post_data);
+      	     $parse_data = json_decode($receive, true);
+      	     
+      	     if(is_array($parse_data) && $parse_data) {
+      	     	$code = $parse_data['error_code'];
+      	     	$hash = $parse_data['data'];
+      	     	$this->returnJsonData($code, $hash);
+      	     }else{
+      	     	$this->returnJsonData(500);
+      	     }
+      }
+      
+      //重置密码
+      public function instPasswd() {
+      	     $post_data = I('request.');
+      	     $data['uid'] = $post_data['uid'];
+      	     $data['repassword'] = $post_data['repassword'];
+      	     if(!($data['uid'] && $data['repassword'])) {
+      	     	$this->returnJsonData(300);
+      	     }
+      	     $data['access_token'] = $this->_access_token;
+      	     $post_data = json_encode($data);
+      	     unset($data);
+      	     $receive = send_curl($this->_update_passwd_url, $post_data);
+      	     $parse_data = json_decode($receive, true);
+      	     
+      	     if(is_array($parse_data) && $parse_data) {
+      	     	$code = $parse_data['error_code'];
+      	     	$hash = $parse_data['data'];
+      	     	$this->returnJsonData($code, $hash);
+      	     }else{
+      	     	$this->returnJsonData(500);
+      	     }
+      }
+      
+      //普通用户注册
+      private function _normalReg($data = array()) {
+      	      if(empty($data)) {
+      	      	       return false;
+      	      }
+      	      $request_data['username'] = $data['username'];
+      	      $request_data['password'] = $data['password'];
+      	      $request_data['source_from'] = $data['source_from'];
+      	      $request_data['access_token'] = $this->_access_token;
+      	      $request_data['user_type'] = $data['user_type'];
+      	      $post_data = json_encode($request_data);
+      	      unset($request_data);
+      	      $receive = send_curl($this->_reg_url, $post_data);
+      	      $parse_data = json_decode($receive, true);
+      	      return $parse_data;
+      }
+      
+      //第三方用户注册
+      private function _thirdReg($data = array()) {
+      	      if(empty($data)) {
+      	      		return false;
+      	      }
+      	      $third_data = $this->_thirdLogin($data);
+      	      //第三方用户名需要加密
+      	      /*$len = strlen($third_data['username']);
+      	      for($i = 0; $i < $len; $i++) {
+      	      	  $ascii += ord($third_data['username'][$i]);
+      	      }
+      	      $username = sha1($ascii);
+      	      $request_data['username'] = $username;*/
+      	      $request_data['username'] = $third_data['username'];
+      	      $request_data['user_type'] = $data['user_type'];
+      	      $request_data['source_from'] = $data['source_from'];
+      	      $request_data['third_part_key'] = $data['third_part_key'];
+      	      $request_data['third_part_value'] = $third_data['third_name'];
+      	      $third_login_data = $this->_userLogin($request_data);
+      	      return $third_login_data;
+      }
+      
+      //第三方登录
+      private function _thirdLogin($data = array()) {
+      	
+      }
+      
 }
