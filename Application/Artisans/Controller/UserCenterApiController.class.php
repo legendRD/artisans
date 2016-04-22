@@ -365,7 +365,44 @@ class UserCenterApiController extends CommonController {
       
       //第三方登录
       private function _thirdLogin($data = array()) {
-      	
+      	      if(empty($data)) {
+      	      	       return false;
+      	      }
+      	      $request_data['user_type'] = $data['user_type'];
+      	      $request_data['source_from'] = $data['source_from'];
+      	      $request_data[$data['third_part_key']] = $data['third_part_value'];
+      	      $request_data['access_token'] = $this->_access_token;
+      	      $post_data = json_encode($request_data);
+      	      unset($request_data);
+      	      $receive = send_curl($this->_thirdlogin_url, $post_data);
+      	      $parse_data = json_decode($receive, true);
+      	      wlog('/share/weixinLog/artisans/user_center_api/reguser_api_'.date('Ymd').'.log', $post_data);
+      	      wlog('/share/weixinLog/artisans/user_center_api/reguser_api_'.date('Ymd').'.log', $parse_data);
+      	      $hash = array();
+      	      if(is_array($parse_data['data']) && $parse_data['error_code'] == 200) {
+      	      	          $hash['third_name'] = $parse_data['data'][$data['third_part_key']];
+      	      	          $hash['username']   = $parse_data['data']['username'];
+      	      }
+      	      return $hash;
       }
       
+      //用户登录
+      private function _userLogin($data = array()) {
+      	      if(empty($data)) {
+      	      	return false;
+      	      }
+      	      $request_data['username']	= $data['username'];
+	      $request_data['password']	= $data['password'];
+	      $request_data['user_type'] = $data['user_type'];
+	      $request_data['source_from'] = $data['source_from'];
+	      $request_data[$data['third_part_key']] = $data['third_part_value'];
+	      $request_data['access_token'] = $this->_access_token;
+	      $post_data = json_encode($request_data);
+	      unset($request_data);
+	      $receive = send_curl($this->_login_url, $post_data);
+	      $parse_data = json_decode($receive, true);
+	      wlog('/share/weixinLog/artisans/user_center_api/reguser_api_'.date('Ymd').'.log', $post_data);
+	      wlog('/share/weixinLog/artisans/user_center_api/reguser_api_'.date('Ymd').'.log', $parse_data);
+	      return $parse_data;
+      }
 }
