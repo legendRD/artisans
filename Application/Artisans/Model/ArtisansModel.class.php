@@ -191,6 +191,80 @@ class ArtisansModel extends Model{
 	  * @return    mixed
 	  */
 	  public function getCityUserInfo($var) {
-	  	
+	  	 $city_id = (int)$var['city_id'];
+	  	 if(empty($city_id)) {
+	  	 	return false;
+	  	 }
+	  	 $status = $this->isOpen($city_id);
+	  	 if(empty($status)) {
+	  	 	return false;
+	  	 }
+	  	 $lng = $var['lng'];
+	  	 $lat = $var['lat'];
+	  	 $order = (int)$var['order_type'];
+	  	 $currpage = $var['currpage'] > 0 ? $var['currpage'] : 1;
+	  	 $page_size = $var['page_size'] > 0 ? $var['page_size'] : 10;
+	  	 $startnum = ($currpage-1) * $page_size;
+	  	 $endnum = $currpage * $page_size;
+	  	 $field = " ccman.CraftsmanId as user_id, GoodRate as good_rate, ServiceNum as service_num, TrueName as true_name, HeadImgCdnUrl as head_img_cdn, HeadImgUrl as head_img, ccman.Source as source, ccman.Description as description, ccman.city as city_id";
+	  	 if($lat && $lng) {
+	  	 	$field .= ", ROUND(craft_get_distance({$lat}, {$lng}, Lat, Lng), 1) as distance ";
+	  	 }
+	  	 switch($order) {
+	  	 	case 3:	//距离
+	  	 		if($lat && $lng) {
+	  	 			$orderby = ' distance asc, good_rate desc ';
+	  	 		}else{
+	  	 			$orderby = ' good_rate desc ';
+	  	 		}
+	  	 		break;
+	  	 	case 1: //好评率
+	  	 		$orderby = ' good_rate desc ';
+	  	 		break;
+	  	 	case 2: //完成单量
+	  	 		$orderby = ' service_num desc, good_rate desc ';
+	  	 		break;
+	  	 	default:
+	  	 		$orderby = ' good_rate desc ';
+	  	 }
+	  	 $user_info = M()->table('prd_product_city ppc')
+	  	 		 ->join('left join prd_product_craftsman ppcman on ppc.ProductId = ppcman.ProductId')
+	  	 		 ->join('left join crt_craftsmaninfo ccman on ppcman.CraftsmanId = ccman.CraftsmanId')
+	  	 		 ->where(array('ppc.CityId'=>$city_id, 'ccman.City'=>$city_id, 'ccman.State'=>0, 'ccman.IsDelete'=>0))
+	  	 		 ->group('user_id')
+	  	 		 ->order($orderby)
+	  	 		 ->limit($startnum, $endnum)
+	  	 		 ->field($field)
+	  	 		 ->select();
+	  	if($user_info) {
+	  		//查询来源
+	  		$source_arr = $this->getCraftSource();
+	  		foreach($user_info as &$value) {
+	  			$value['source'] = $source_arr[$value['source']];
+	  		}
+	  	}else{
+	  		$user_info = array();
+	  	}
+	  	return $user_info;
 	  }
+	  
+	  /*
+	   * 城市是否开通
+	   * @access      public
+	   * @param       int     $city_id   城市id
+	   * @return      boolean
+	   */
+	   public function isOpen($city_id) {
+	   	  $city_id = (int)$city_id;
+	   	  $status  = M('sys_city')->where(array('CityId'=>$city_id))->getField('IsOpen');
+	   	  if($status == 0) {
+	   	  	return true;
+	   	  }else{
+	   	  	return false;
+	   	  }
+	   }
+	   
+	   /*
+	    * 获取某个产品下面的XXX
+	    * @
 }
