@@ -380,6 +380,17 @@ class ArtisansModel extends Model{
 		}
 		$limit = "limit {$startnum}, {$endnum} ";
 		$sql = $field.$table.$where.$orderby.$limit;
+		$user_info = M()->query($sql);
+		if($user_info) {
+			//查询来源
+			$source_arr = $this->getCraftSource();
+			foreach($user_info as &$value) {
+				$value['source'] = $source_arr[$value['source']];
+			}
+		}else{
+			$user_info = array();
+		}
+		return $user_info;
 	 }
 	 
 }
