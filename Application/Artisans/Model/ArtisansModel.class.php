@@ -309,4 +309,77 @@ class ArtisansModel extends Model{
 		   }
 		   return $user_info;
 	    }
+	    
+	/*
+	 * 查询XXX信息
+	 * @access public
+	 * @param  array  $var
+	 * @return mixed
+	 */
+	 public function getUserInfo($var) {
+	 	$pro_price	= $var['pro_price'];
+		$pro_id	        = $var['pro_id'];
+		$city_id        = $var['city_id'];
+		$date	        = $var['date'];
+		$time_id	= $var['time_id'];
+		$lat	        = $var['lat'];
+		$lng	        = $var['lng'];
+		$order	        = $var['order_type'];
+		$currpage	= $var['currpage'];
+		$page_size	= $var['page_size'];
+		$pro_price	= $pro_price>0 ? $pro_price:0;
+		$currpage	= $currpage >0 ? $currpage :1;
+		$page_size	= $page_size>0 ? $page_size:10;
+		$startnum 	= ($currpage-1)*$page_size;
+		$endnum		= $currpage*$page_size;
+		if(!($pro_id && $city_id)) {
+			return false;
+		}
+		$field = ' select ccman.CraftsmanId as user_id, GoodRate as good_rate, ServiceNum as service_num, TrueName as true_name, HeadImgCdnUrl as head_img_cdn, HeadImgUrl as head_img, ccman.Source as source, ccman.Description as description, ccman.city as city_id';
+		if($time_id && $date) {
+			$field .= ', NouseNum as cctime_num';
+		}
+		if($lat && $lng) {
+			if($time_id && $date) {
+				$field .= ", ROUND(craft_get_distance({$lat}, {$lng}, Lat, Lng) as ditance, ({$pro_price}+(CASE when cctime.Price>0 THEN cctime.Price ELSE 0 END)+ifnull((SELECT ROUND(craft_get_distance({$lat}, {$lng}, Lat, Lng))*Price FROM crt_craftsman_distance ccd WHERE ccd.CraftsmanId = ccman.CraftsmanId AND ccd.`Min`<=ROUND(craft_get_distance({$lat}, {$lng}, Lat, Lng)) AND ccd.`Max` > ROUND(craft_get_distance({$lat}, {$Lng}, Lat, Lng)) limit 1),0)+(CASE when Addition > 0 THEN Addition ELSE 0 END)) as total_price ";
+			}else{
+				$field .= ", ROUND(craft_get_distance({$lat},{$lng},Lat,Lng),1) as distance, ifnull({$pro_price}+ifnull((SELECT ROUND(craft_get_distance({$lat},{$lng},Lat,Lng))*Price FROM crt_craftsman_distance ccd WHERE ccd.CraftsmanId=ccman.CraftsmanId AND ccd.`Min`<=ROUND(craft_get_distance({$lat},{$lng},Lat,Lng)) AND ccd.`Max`>ROUND(craft_get_distance({$lat},{$lng},Lat,Lng))),0)+(CASE when Addition>0 THEN Addition ELSE 0 END)) as total_price ";
+			}
+		}else{
+			if($time_id && $date) {
+				$field .= " ({$pro_price} + (CASE when cctime.Price > 0 THEN cctime.Price ELSE 0 END) + (CASE when Addition > 0 THEN Addition ELSE 0 END)) as total_price "
+			}else{
+				$field .= " ({$pro_price} + (CASE when Addition > 0 THEN Addition ELSE 0 END)) as total_price ";
+			}
+		}
+		$table = " FROM prd_product_craftsman ppcman LEFT JOIN crt_craftsmaninfo ccman ON ppcman.CraftsmanId = ccman.CraftsmanId LEFT JOIN crt_craftsman_add ccadd on ccadd.CraftsmanId = ccman.CraftsmanId ";
+		$where = " WHERE ppcman.ProductId = {$pro_id} AND ccman.City = {$city_id} and ccman.State = 0 and ccman.IsDelete = 0 ";
+		if($time_id && $date) {
+			$table .= " LEFT JOIN crt_capacity cctime ON ccman.CraftsmanId = cctime.CraftsmanId ";
+			$where .= " AND cctime.TimeId = {$time_id} and cctime.Capacity = '{$date}' and NouseNum > 0 ";
+		}
+		switch($order) {
+			case 4: //价格
+				$orderby = ' order by total_price asc, good_rate desc ';
+				break;
+			case 3: //距离
+				if($lat && $lng) {
+					$orderby = ' order by distance asc, good_rate desc ';
+				}else{
+					$orderby = ' order by good_rate desc, total_price asc ';
+				}
+				break;
+			case 1: //好评率
+				$orderby = ' order by good_rate desc, total_price asc ';
+				break;
+			case 2: //完成单量
+				$orderby = ' order by service_num desc, good_rate desc ';
+				break;
+			default:
+				$orderby = ' order by good_rate desc, total_price asc';
+		}
+		$limit = "limit {$startnum}, {$endnum} ";
+		$sql = $field.$table.$where.$orderby.$limit;
+	 }
+	 
 }
