@@ -266,5 +266,47 @@ class ArtisansModel extends Model{
 	   
 	   /*
 	    * 获取某个产品下面的XXX
-	    * @
+	    * @param     array     $var
+	    * city_id    int             城市id 【必传】
+	    * pro_id     int             产品id 【必传】
+	    * time       datetime        预约时间
+	    * lat        float           纬度
+	    * lng        float           经度
+	    * order_type int             排序 【4价格，3距离，2完成订单量】
+	    * @return    mixed
+	    */
+	    public function getProUserInfo($var) {
+	    	   $data['city_id']	= $city_id	  = (int)$var['city_id'];
+		   $data['pro_id']	= $pro_id         = (int)$var['pro_id'];
+		                          $time		  = $var['time'];
+		   $data['lat']	        = $lat		  = $var['lat'];
+		   $data['lng']		= $lng		  = $var['lng'];
+		   $data['order_type']	= $order_type     = (int)$var['order_type'];
+		   $date = date('Y-m-d',strtotime($time));
+		   if(!($city_id && $pro_id)) {
+		   	return false;
+		   }
+		   //判断城市该产品上架
+		   $is_shelves	= $this->isShelves($pro_id,$city_id);
+		   if(!$is_shelves) {
+		   	return false;
+		   }
+		   //产品的价格
+		   $pro_info    = $this->getOneProInfo($pro_id, $city_id, 1);
+		   $pro_price   = $pro_info[0]['true_price'];
+		   //时间id
+		   $time_id     = $this->getTimeId($time);
+		   $user_info   = array();
+		   if(empty($time_id) && $time) {
+		   	return false;
+		   }else{
+		   	$data['pro_price'] = $pro_price;
+		   	$data['date']      = $date;
+		   	$data['time_id']   = $time_id;
+		   	$data['currpage']  = $var['currpage'];
+		   	$data['page_size'] = $var['page_size'];
+		   	$user_infp = $this->getUserInfo($data);
+		   }
+		   return $user_info;
+	    }
 }
