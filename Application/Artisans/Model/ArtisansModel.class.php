@@ -470,6 +470,86 @@ class ArtisansModel extends Model{
 	     	    	'ppinfo.IsShelves'=>1
 	     	    );
 	     	    $product_id = M()->table('prd_product_city ppc')
-	     	                     
+	     	                     ->join(' left join prd_productinfo ppinfo on ppc.`ProductId` = ppinfo.`ProductId`')
+	     	                     ->join(' left join prd_promotion pp on ppinfo.`ProductId` == pp.`ProductId')
+	     	                     ->where($where)
+	     	                     ->getField('ppinfo.`ProductId` as product_id')
+	     	    if($product_id) {
+	     	    	return true;
+	     	    }else{
+	     	    	return false;
+	     	    }
 	     }
-}
+	     
+	     /*
+	      * 订单活动明细
+	      * @access public 
+	      * @param  int    $active_id
+	      * @param  int    $order_id
+	      * @return mixed
+	      */
+	      public function addOrderActive($active_id, $order_id) {
+	      	     if($active_id && $order_id) {
+	      	     	 $data['OrderId']     = $order_id;
+	      	     	 $data['ActiveId']    = $active_id;
+	      	     	 $data['CreaterTime'] = date('Y-m-d H:i:s');
+	      	     	 $id                  = M('ord_order_activeId')->add($data);
+	      	     	 if(empty($id)) {
+	      	     	 	//订单活动表日志
+	      	     	 	return false;
+	      	     	 }else{
+	      	     	 	return $id;
+	      	     	 }
+	      	     }else{
+	      	     	   return false;
+	      	     }
+	      }
+	      
+	      /*
+	       * 订单套餐明细
+	       * @access public
+	       * @param  int    $order_id
+	       * @param  int    $package_id
+	       * @return mixed
+	       */
+	       public function addPackage($var, $package_id='') {
+	       	      $order_id = $var['order_id'];
+	       	      $package_id = (int)$package_id;
+	       	      $order_id   = (int)$order_id;
+	       	      if(empty($order_id)) {
+	       	      	       return false;
+	       	      }
+	       	      if($package_id) {
+	       	      	 $package_info = M()->table('prd_package pinfo')
+	       	      	                    ->join('prd_packageitme pdetail on pinfo.PackageId = pdetail.PackageId')
+	       	      	                    ->join('prd_packageinfo pp on detail.ProductId = pp.ProductId')
+	       	      	                    ->where(array('pdetail.Packageid'=>$package_id))
+	       	      	                    ->field('pinfo.Name as name, pinfo.Price as price, pdetail.ProductId as product_id, pdetail.Price as product_price, pp.ProductName as product_name')
+	       	      	                    ->select();
+	       	      	if($package_info) {
+	       	      		foreach($package_info as $value) {
+	       	      			$tmp['OrderId']     = $order_id;
+	       	      			$tmp['PackageId']   = $package_id;
+	       	      			$tmp['PackageName'] = $value['name'];
+	       	      			$tmp['ProductId']   = $value['product_id'];
+	       	      			$tmp['ProductName'] = $value['product_name'];
+	       	      			$tmp['Price']       = $value['product_price'];
+	       	      			$data[]             = $tmp;
+	       	      		}
+	       	      		$id = M('ord_order_item')->addAll($data);
+	       	      	}
+	       	      }else{
+	       	      	   $data['OrderId']     = $order_id;
+	       	      	   $data['ProductId']   = $var['product_id'];
+	       	      	   $data['ProductName'] = $var['product_name'];
+			   $data['Price']	= $var['product_price'];
+			   $id = M('ord_order_item')->add($data);
+	       	      }
+	       	      if($id) {
+	       	      	        return $id;
+	       	      }else{
+	       	      	        //订单套餐日志表
+	       	      	        return false;
+	       	      }
+	       }
+ }
