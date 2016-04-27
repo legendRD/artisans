@@ -393,4 +393,61 @@ class ArtisansModel extends Model{
 		return $user_info;
 	 }
 	 
+	 /*
+	  * XXX来源
+	  * @access private
+	  * @return multitype
+	  */
+	  public function getCraftSource() {
+	  	$info = M('sys_dictionary')->where(array('Type'=>4))->select();
+	  	if($info) {
+	  		foreach($info as $value) {
+	  			$data[$value['DisValue']] = $value['DisKey'];
+	  		}
+	  	}else{
+	  		$data = array();
+	  	}
+	  	return $data;
+	  }
+	  
+	  /*
+	   * 获取时间id
+	   * @access public
+	   * @param  datetime $time 预约时间
+	   * @return number
+	   */
+	   public function getTimeId($time) {
+	   	  if(empty($time)) {
+	   	  	return false;
+	   	  }
+	   	  $date = date('Y-m-d', strtotime($time));
+	   	  $prd_servicetime = M('prd_servicetime')->where('IsDelete = 0')->select();
+	   	  $time_id = 0;
+	   	  if(is_array($prd_servicetime) && $prd_servicetime) {
+	   	  	foreach($prd_servicetime as $value) {
+	   	  		if(strtotime($date.' '.$value['StartTime'].':00')<=strtotime($time) && strtotime($date.' '.$value['EndTime'].':00')>=strtotime($time)) {
+	   	  			$time_id = $value['TimeId'];
+	   	  			break;
+	   	  		}
+	   	  	}
+	   	  }
+	   	  return $time_id;
+	   }
+	   
+	   /*
+	    * 时间id信息
+	    * @access public
+	    * @param  int    $time_id
+	    * @return mixed
+	    */
+	    public function getTimeIdInfo($time_id) {
+	    	   if(empty($time_id)) {
+	    	   	return false;
+	    	   }
+	    	   $time_id_info = M('prd_servicetime')->find($time_id);
+	    	   return $time_id_info;
+	    }
+	    
+	    /*
+	     * 判断产品有没有
 }
