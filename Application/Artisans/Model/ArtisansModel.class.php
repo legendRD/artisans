@@ -449,5 +449,27 @@ class ArtisansModel extends Model{
 	    }
 	    
 	    /*
-	     * 判断产品有没有
+	     * 判断产品有没有上架
+	     * @access public
+	     * @param  int     $pro_id  产品id
+	     * @param  int     $city_id 城市id
+	     * @return boolean
+	     */
+	     public function isShelves($pro_id, $city_id) {
+	     	    if(!($pro_id && $city_id)) {
+	     	    	 return false;
+	     	    }
+	     	    $is_open = $this->isOpen($city_id);
+	     	    if(empty($is_open)) {
+	     	    	 return false;
+	     	    }
+	     	    $where = array(
+	     	    	'ppc.`CityId`'=>$city_id,
+	     	    	'ppc.`ProductId`'=>$pro_id,
+	     	    	'ppinfo.IsDelete'=>0,
+	     	    	'ppinfo.IsShelves'=>1
+	     	    );
+	     	    $product_id = M()->table('prd_product_city ppc')
+	     	                     
+	     }
 }
