@@ -552,4 +552,54 @@ class ArtisansModel extends Model{
 	       	      	        return false;
 	       	      }
 	       }
+	       
+	       /*
+	        * 优惠券支付
+	        * @access public
+	        * @param  int     $order_id
+	        * @param  int     $pay_way
+	        * @param  string  $pay_code
+	        * @return mixed
+	        */
+	        public function addPayPreferential($order_id, $pay_way, $pay_code) {
+	        	if($order_id && $pay_way && $pay_code) {
+	        		$data['OrderId']	= $order_id;
+				$data['PayWay']		= $pay_way;
+				$data['PayCode']	= $pay_code;
+				$data['CreaterTime']    = date('Y-m-d H:i:s');
+				$id = M('ord_pay')->add($data);
+				if($id) {
+					return $id;
+				}else{
+					//优惠券支付日志
+					return false;
+				}
+	        	}else{
+	        		return false;
+	        	}
+	        }
+	        
+	        /*
+	         * 订单状态明细
+	         * @access private
+	         * @param  array   $var
+	         * @return mixed
+	         */
+	         public function addOrderState($var) {
+	                $data['OrderId'] = $order_id = $var['order_id'];
+	                if(empty($order_id)) {
+	                	return false;
+	                }
+	                $data['State']       = (int)$var['state'];
+	                $data['Description'] = $var['state_desc'];
+	                $data['CreaterBy']   = $var['cuid'] ? $var['cuid'] : 0;
+	                $data['CreaterTime'] = $var['create_time'];
+	                $id = M('ord_state')->add($data);
+	                if($id) {
+	                	return $id;
+	                }else{
+	                	//订单状态日志
+	                	return false;
+	                }
+	         }
  }
