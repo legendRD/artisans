@@ -610,6 +610,10 @@ class ArtisansModel extends Model{
 	          * @param   array  $arr
 	          */
 	          public function addUpdateOrder($order_id, $arr) {
-	          	
+	          	 $order_info = M('ord_orderinfo')->find($order_id);
+	          	 $update_content = '';
+	          	 foreach($order_info as $key=>$value) {
+	          	 	if($arr[$key]!=>$value && isset($arr[$key])) {
+	          	 		$update_content .= $key.'◎◎'.$arr[$key].'◎◎'.$value          	 }
 	          }
  }
