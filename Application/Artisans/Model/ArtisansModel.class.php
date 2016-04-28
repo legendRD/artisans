@@ -899,5 +899,19 @@ class ArtisansModel extends Model{
 		}
 	}
 	
-	
+	/**
+	 * 订单XX是否存在
+	 * @access public
+	 * @param array $orderinfo	订单信息
+	 * @return boolean
+	 */
+	 public function existTime($orderinfo) {
+	 	$reservation_time = $orderinfo['ReservationTime'];
+	 	//判断日期是否过期，小于1小时过期
+	 	if(strtotime($reservation_time) < time()-3600 || !$reservation_time) {
+	 		return false;
+	 	}
+	 	$capacity_id = $orderinfo['CapacityId'];
+	 	$time_num = M('crt_use')->where(array('CapacityId'=>$capaicty_id, ''))
+	 }
  }
