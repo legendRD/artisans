@@ -691,5 +691,141 @@ class ArtisansModel extends Model{
 			   }
 	            }
 	            
+	/**
+	 * 支付获取商品名
+	 * @param int $order_id
+	 * @return boolean|multitype:unknown Ambigous <>
+	 */
+	public function getOrderShopInfo($order_id) {
+		if(empty($order_id)) {
+			return false;
+		}
+		$order_shop_info	= M()->table('ord_orderinfo as oo')
+					     ->join(' left join ord_order_item as ooi on oo.OrderId=ooi.OrderId ')
+					     ->where(array('oo.OrderId'=>$order_id))
+					     ->join('left join prd_productinfo as pp on pp.ProductId=ooi.ProductId')
+					     ->field('count(1) num,ooi.PackageId package_id,ooi.PackageName package_name, group_concat(ooi.ProductId) as pro_id,group_concat(ooi.ProductName)as pro_name,LogoImgUrl,LogoImgCdnUrl')->group('oo.OrderId')
+					     ->find();
+		$tmp	= array();
+		if($order_shop_info) {
+			if($order_shop_info['package_id']) {
+				$tmp['shop_name']	= $order_shop_info['package_name'];
+				$tmp['shop_id']		= $order_shop_info['package_id'];
+			}elseif($order_shop_info['num']>1){
+				$tmp['shop_name']	= $order_shop_info['pro_name'];
+				$tmp['shop_id']		= $order_shop_info['pro_id'];
+				$tmp['pro_img']		= $this->getImgUrl($order_shop_info['LogoImgCdnUrl'],$order_shop_info['LogoImgUrl']);
+			}else{
+				$tmp['shop_name']	= $order_shop_info['pro_name'];
+				$tmp['shop_id']		= $order_shop_info['pro_id'];
+				$tmp['pro_img']		= $this->getImgUrl($order_shop_info['LogoImgCdnUrl'],$order_shop_info['LogoImgUrl']);
+			}
+		}
+		return $tmp;
+	}
 	
+	/*
+	 * 获取用户注册信息
+	 * @access	public
+	 * @param	string $phone
+	 * @return	mixed
+	 */
+	 public function getUser($phone) {
+	 	if(empty($phone)) {
+	 		return false;
+	 	}
+	 	$user_info = M('cut_customer')->where(array('LoginName'=>$phone, 'IsDelete'=>0))->find();
+	 	return $user_info;
+	 }
+	 
+	 /*
+	 * 获取用户注册信息
+	 * @access	public
+	 * @param	int $user_id
+	 * @return 	mixed
+	 */
+	public function getUser2($user_id) {
+		if(empty($user_id)) {
+			return false;
+		}
+		$info['uid']=$user_id;
+		$user_center_info = send_curl(C('ArtisansApi').'/UserCenterApi/getUserInfo', $info);
+		$user = json_decode($user_center_info, true);
+		if($user['code'] == 200) {
+			$data['user_id']	= (int)$user['data']['uid'];
+			$data['name']		= (string)$user['data']['nickname'];
+			$data['lastLogin']	= date("Y-m-d H:i:s",$user['data']['last_login_time']);
+			$data['headImg']	= C('TMPL_PARSE_STRING')['__IMG_URL__'].$user['data']['avatar'];
+			$data['cdate']		= date("Y-m-d H:i:s",$user['data']['regdate']);
+			$data['udate']		= date("Y-m-d H:i:s");
+			$data['phone']		= (string)$user['data']['other'];
+			return $data;
+		}else{
+			return false;
+		}
+	}
+	
+	/**
+	 * 获取图片地址
+	 * @access public
+	 * @param unknown $cdn_url
+	 * @param unknown $self_url
+	 * @return unknown|string
+	 */
+	 public function getImgUrl($cdn_url, $self_url) {
+	 	if($cdn_url) {
+	 		return $cdn_url;
+	 	}else{
+	 		if($self_url) {
+	 			return I('server.HTTP_HOST').$self_url;
+	 		}else{
+	 			return '';
+	 		}
+	 	}
+	 }
+	 
+	 /**
+	 * 是否第一次下单
+	 * @access public
+	 * @param int $user_id	用户id
+	 * @param array $source_arr	订单来源
+	 * @return boolean|unknown
+	 */
+	 public function isFirstOrder($user_id, $source_arr) {
+	 	if(empty($user_id)) {
+	 		return false;
+	 	}
+	 	if(!($source_arr && is_array($srouce_arr))) {
+	 		return false;
+	 	}
+	 	$where = array(
+	 		'UserId'=>$user_id,
+	 		'Source'=>array('in', $source_arr),
+	 		'Satatus'=>array('gt', 1)
+	 	);
+	 	$count = M('ord_orderinfo')->where($where)->count();
+	 	return $count;
+	 }
+	 
+	 /**
+	 * XXXXX存在
+	 * @param int $user_id
+	 * @param int $capacity_id
+	 * @param int $time_id
+	 * @return mixed
+	 */
+	 public function isCapacity($user_id, $reservation_time) {
+	 	if(!($user_id && $reservation_time)) {
+	 		return false;
+	 	}
+	 	$date = date('Y-m-d', strtotime($reservation_time));
+	 	$time_id = $this->getTimeId($reservation_time);
+	 	$where = array(
+	 		'Capacity'=>$date,
+	 		'CraftsmanId'=>$user_id,
+	 		'TimeId'=>$time_id
+	 	);
+	 	$capacity_info = M('crt_capacity')->where($where)->find();
+	 	return $capacity_info;
+	 }
  }
