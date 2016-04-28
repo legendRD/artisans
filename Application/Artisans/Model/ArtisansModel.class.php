@@ -602,4 +602,14 @@ class ArtisansModel extends Model{
 	                	return false;
 	                }
 	         }
+	         
+	         /*
+	          * 更改订单
+	          * @access  public
+	          * @param   int    $order_id
+	          * @param   array  $arr
+	          */
+	          public function addUpdateOrder($order_id, $arr) {
+	          	
+	          }
  }
