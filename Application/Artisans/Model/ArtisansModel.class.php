@@ -828,4 +828,76 @@ class ArtisansModel extends Model{
 	 	$capacity_info = M('crt_capacity')->where($where)->find();
 	 	return $capacity_info;
 	 }
+	 
+	 /**
+	 * 获取用户订单信息
+	 * @param int $user_id
+	 * @param array $source
+	 * @return mixed
+	 */
+	public function moreOrderInfo($user_id,$source=array()) {
+		if(empty($user_id)) {
+			return false;
+		}
+		$where	= array(
+				'UserId'=>$user_id,
+				'IsDelete'=>0
+		);
+		if(is_array($source) && $source) {
+			$where['Source'] = array('in',$source);
+		}
+		$order_info	= M('ord_orderinfo')->where($where)->order(" OrderId desc ")->select();
+		return $order_info;
+	}
+	
+	/**
+	 * 订单信息
+	 * @access public
+	 * @param int $order_id
+	 * @return mixed
+	 */
+	public function oneOrderInfo($order_id) {
+		if(empty($order_id)) {
+			return false;
+		}
+		$order_info	= M('ord_orderinfo')->find($order_id);
+		return $order_info;
+	}
+	
+	/**
+	 * XXX信息
+	 * @access public
+	 * @param int $craft_id
+	 * @return mixed
+	 */
+	public function getCraftInfo($craft_id) {
+		if(empty($craft_id)) {
+			return false;
+		}
+		$craft_info	= M('crt_craftsmaninfo')->find($craft_id);
+		return $craft_info;
+	}
+	
+	/**
+	 * XXX支持的产品id
+	 * @access public
+	 * @param int $craft_id
+	 * @return boolean|unknown
+	 */
+	public function getProId($craft_id) {
+		if(empty($craft_id)) {
+			return false;
+		}
+		$pro_id_info	= M('prd_product_craftsman')->where(array('CraftsmanId'=>$craft_id))->select();
+		if($pro_id_info){
+			foreach($pro_id_info as $value){
+				$data[]	= $value['ProductId'];
+			}
+			return $data;
+		}else{
+			return false;
+		}
+	}
+	
+	
  }
