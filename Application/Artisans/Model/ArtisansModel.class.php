@@ -614,6 +614,82 @@ class ArtisansModel extends Model{
 	          	 $update_content = '';
 	          	 foreach($order_info as $key=>$value) {
 	          	 	if($arr[$key]!=>$value && isset($arr[$key])) {
-	          	 		$update_content .= $key.'◎◎'.$arr[$key].'◎◎'.$value          	 }
+	          	 		$update_content .= $key.'◎◎'.$arr[$key].'◎◎'.$value.'||';
+	          	 	}
+	          	 }
+	          	 $data['OrderId'] = $order_id;
+	          	 $data['UpdateContent'] = $update_content;
+	          	 $data['CreaterTime'] = date('Y-m-d H:i:s');
+	          	 $id = M('ord_update')->add($data);
+	          	 if($id) {
+	          	 	//更改订单日志
+	          	 	return true;
+	          	 }else{
+	          	 	return false;
+	          	 }
 	          }
+	          
+	          /*
+	           * 产品活动是否存在
+	           * @access public 
+	           * @param  int     $pro_id
+	           * @param  int     $active_id
+	           * @param  string  $datetime
+	           * @return boolean
+	           */
+	           public function isProActive($pro_id, $active_id, $datetime='') {
+	           	  $datetime = empty($datetime) ? date('Y-m-d H:i:s') : $datetime;
+	           	  if(!($pro_id && $active_id)) {
+	           	  	return false;
+	           	  }
+	           	  $where = array(
+	           	  	'pap.ActiveId'=>$active_id,
+	           	  	'pap.ProductId'=>$pro_id,
+	           	  	'pa.StartTime'=>array('elt', $datetime),
+	           	  	'pa.EndTime'=>array('glt', $datetime),
+	           	  	'pa.IsDelete'=>0
+	           	  );
+	           	  $active_id = M()->table('prd_active_product pap')
+	           	  		  ->join('prd_active pa on pa.ActiveId = pap.ActiveId')
+	           	  		  ->where($where)
+	           	  		  ->getField('pa.ActiveId');
+	           	  if($active_id) {
+	           	  	return true;
+	           	  }else{
+	           	  	return false;
+	           	  }
+	           }
+	           
+	           /*
+	            * 收货地址
+	            * @access  public
+	            * @param   unknown $var
+	            * @return  boolean
+	            */
+	            public function addAddress($var) {
+	            	   $data['userId'] = $user_id = $var['user_id'];
+	            	   if(empty($user_id)) {
+	            	   	return false;
+	            	   }
+	            	   $data['IsDefault']   = $var['is_default'] ? 1 : 0;
+	            	   $data['Name']        = $var['name'];
+	            	   $data['Sex']	        = $var['sex']==0 ? 0 : 1;	//0女，1男
+			   $data['Province']    = $var['province_id'];
+			   $data['City']	= $var['city_id'];
+			   $data['Area']	= ''; 				//暂时不用
+			   $data['Address']	= $var['address'];
+			   $data['Phone']	= $var['phone'];
+			   $data['Phone1']	= $var['second_phone'];
+			   $data['Email']	= $var['email'];
+			   $data['CreaterTime']	= date('Y-m-d H:i:s');
+			   $data['IsDelete']	= 0;
+			   $id = M('cut_address')->add($data);
+			   if($id) {
+			   	return $id;
+			   }else{
+			   	return false;
+			   }
+	            }
+	            
+	
  }
