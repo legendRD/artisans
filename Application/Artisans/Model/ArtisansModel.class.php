@@ -912,6 +912,52 @@ class ArtisansModel extends Model{
 	 		return false;
 	 	}
 	 	$capacity_id = $orderinfo['CapacityId'];
-	 	$time_num = M('crt_use')->where(array('CapacityId'=>$capaicty_id, ''))
+	 	$time_num = M('crt_use')->where(array('CapacityId'=>$capaicty_id, 'UserId'=>$orderinfo['UserId']))->count();
+	 	if($time_num == 1) {
+	 		return true;
+	 	}else{
+	 		return false;
+	 	}
+	 }
+	 
+	 /**
+	 * XXX产品信息
+	 * @param unknown $craft_id
+	 * @return boolean|multitype:Ambigous <\Artisans\Model\unknown, string, unknown>
+	 */
+	 public function getCraftProImg($craft_id) {
+	 	if(empty($craft_id) || !is_numeric($craft_id)) {
+	 		return false;
+	 	}
+	 	$pro_info = M()->table('prd_product_craftsman ppc')
+	 		       ->join('left join prd_productinfo pp on ppc.ProductId = pp.ProductId')
+	 		       ->where('ppc.CraftsmanId = '.$craft_id)
+	 		       ->field('LogoImgUrl, LogoImgCdnUrl, ProductName, ppc.ProductId, DetailImgUrl, DetailImgCdnUrl')
+	 		       ->select();
+	        $pro_infos = array();
+	        foreach((array)$pro_info as $v) {
+	        	if($v) {
+	        		$tmp['logo_img_url'] = $this->getImgUrl($v['LogoImgCdnUrl'], $v['LogoImgUrl']);
+	        		$tmp['detail_img_url'] = $this->getImgUrl($v['DetailImgCdnUrl'], $v['DetailImgUrl']);
+	        		$tmp['pro_id'] = $v['ProductId'];
+	        		$tmp['pro_name'] = $v['ProductName'];
+	        		$pro_imgs[] = $tmp;
+	        	}
+	        }
+	        return $pro_imgs;
+	 }
+	 
+	 /**
+	 * 减XX
+	 * @access private
+	 * @param int $capacity_id
+	 * @return mixed
+	 */
+	 public function reduceCapacity($capacity_id) {
+	 	if(!($capaicty_id && is_numeric($capacity_id)) {
+	 		return false;
+	 	}
+	 	$id = M('crt_capacity')->where(array('CapacityId'=>$capacity_id, 'NouseNum'=>array('gt', 0)))->setDec('NouseNum');
+	 	return $id;
 	 }
  }
