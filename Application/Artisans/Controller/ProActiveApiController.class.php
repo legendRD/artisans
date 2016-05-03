@@ -7,17 +7,78 @@ class ProActiveApiController extends CommonController {
       
       //检测token是否存在
       private function _checkToken($access_token) {
-        
+              $string	            = $this->_five58_string;
+		  $data['md5_string']	= $access_token;
+		  $data['key']		= $this->_secret_key;
+		  $decode			= D('Token')->checkSuanfaToken($data);
+		  if($decode && $string==$decode){
+			$this->_access_token	= true;
+		  }else{
+			$this->_access_token	= false;
+		  }
       }
       
       //获取密钥
       public function getAccessToken($param = null) {
-        
+             if(isset($param)){
+			$post_data	= $param;
+		 	$exit_type	= 'array';
+		 }else{
+			$post_data	= I('post.');
+			$exit_type	= 'json';
+		 }
+		 $real_source     = trim($post_data['real_source']);       //算法字符串
+		 
+		 if(empty($real_source)) {
+		       return $this->returnJsonData($exit_type,300);
+		 }
+		 if($real_source <> $this->_five58_string) {
+		       return $this->returnJsonData($exit_type,10001);
+		 }
+		 
+		 $data['string']	= $this->_five58_string; 
+		 $data['key']	= $this->_secret_key;
+		 $data['expires'] = 7200;
+		 $access_token	= D('Token')->getSuanfaToken($data);
+		 
+		 $return_data['access_token']	= $access_token;
+		 return $this->returnJsonData($exit_type, 200, $return_data);
       }
       
       //58绑定用户优惠券
       public function bindPhoneCode($param = null) {
-        
+             if(isset($param)){
+			$post_data	= $param;
+			$exit_type	= 'array';
+		}else{
+			$post_data	= I('post.');
+			$exit_type	= 'json';
+		}
+		wlog('/share/weixinLog/artisans/58_phone.log', $post_data['phone']);
+		$access_token = $post_data['access_token'];
+		$this->_checkToken($access_token);
+		if(!$this->_access_token) {
+		      return $this->returnJsonData($exit_type, 10002);      //没有权限
+		}
+		$phone = $post_data['phone'];
+		if(empty($phone)) {
+		      return $this->returnJsonData($exit_type, 300);
+		}
+		if(!check_phone($phone)) {
+		      return $this->returnJsonData($exit_type, 10003);      //手机号格式有误
+		}
+		$now_time = date('Y-m-d H:i:s');
+		$rand_code = mt_rand('100000', '999999');
+		$data['CouponsId'] = 1;
+		$data['Phone']     = $phone;
+		$data['CodeNum']   = $rand_code;
+		$data['Source']    = 1;
+		$data['IsUse']     = 0;
+		$data['CreateTime']= $now_time;
+		$where = array(
+		      'Source'=>1,
+		      'Phone'=>$phone
+		);
       }
       
       public function returnJsonData($exit_type,$code,$data=array(),$msg=''){
