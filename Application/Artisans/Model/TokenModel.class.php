@@ -14,7 +14,15 @@ class TokenModel extends Model {
     	       if(!$url) {
     	           return false;
     	       }
-    	       
+    	       $post_data = json_encode(array('realm'=>'XXX'));
+    	       $receive   = send_curl($url, $post_data);
+    	       $parse_data= json_decode($receive, true);
+    	       if(is_array($parse_data['data']) && $parse_data['data']['access_token']) {
+    	             $token = $parse_data['data']['access_token'];
+    	       }else{
+    	             wlog('/share/weixinLog/artisans/user_center_api/user_center_token'.date('Ymd').'.log', $parse_data);
+    	       }
+    	       return $token;
     	}
     	
     	/**
