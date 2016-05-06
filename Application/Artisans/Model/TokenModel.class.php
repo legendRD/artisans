@@ -32,8 +32,22 @@ class TokenModel extends Model {
     	 * @return	string|boolean
     	 */
     	public function apiAccessToken($prefix = '') {
-    	       $token = create_uuid($prefix);
-    	       
+    	       $token  = create_uuid($prefix);
+    	       $second = 7500;
+    	       $start_time = time();
+    	       $end_time = $start_time + $second;
+    	       $data = array(
+    	             'token'=>$token,
+    	             'expires_in'=>$second,
+    	             'expires_start'=>$start_time,
+    	             'expires_end'=>$end_time
+    	       );
+    	       $id = M('api_token')->add($data);
+    	       if($id) {
+    	             return $token;
+    	       }else{
+    	             return false;
+    	       }
     	}
     	
     	/**
@@ -46,18 +60,32 @@ class TokenModel extends Model {
     	       if(empty($access_token)) {
     	                return false;
     	       }
-    	       
+    	       $where = array('token'=>$access_token);
+    	       $token_info = M('api_token')->where($where)->find();
+    	       if($token_info) {
+    	             if($token['expires_end'] < time()) {
+    	                   return false;
+    	             }else{
+    	                   return true;
+    	             }
+    	       }else{
+    	             return false;
+    	       }
     	}
     	
     	/**
     	 * 获取算法token值
-    	 * @param	string $param['string']	要加密的字符串
-    	 * @param	string $param['key']		加密秘钥
+    	 * @param	string   $param['string']	要加密的字符串
+    	 * @param	string   $param['key']		加密秘钥
     	 * @param	int	   $param['expires']	过期时间(单位：秒)
     	 * @return	string
     	 */
     	public function getSuanfaToken($param) {
-    	  
+    	       $string = $param['string'];
+    	       $key    = $param['key'] ? $param['key'] : 'XXX';
+    	       $expire = $param['expires'] ? $param['expires'] : 7200;
+    	       $token = $this->_t_ucenter_encrypt($string, $key, $expire);
+    	       return $token;
     	}
     	
     	/**
@@ -67,7 +95,10 @@ class TokenModel extends Model {
     	 * @return	string	
     	 */
     	public function checkSuanfaToken($param) {
-    	  
+    	       $md5_string = $param['md5_string'];
+    	       $key = $param['key'] ? $param['key'] : 'XXX';
+    	       $string = $this->_t_ucenter_decrypt($md5_string, $key);
+    	       return $string;
     	}
     	
     	/**
