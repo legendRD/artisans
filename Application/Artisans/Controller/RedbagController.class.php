@@ -62,4 +62,37 @@ class RedbagController extends CommonController {
              $this->assign('jump_url', $jump_url);
              $this->display(T('Craft/qcs_card'));
       }
+      
+      public function getcard_info($cardid, $openid) {
+             if($cardid) {
+                   $getcard_artisans_url  = $this->_artisans_url.'?id='.$cardid.'&openid='.$openid;
+                   $getcard_artisans_info = send_get_curl($getcard_artisans_url);
+                   $getcard_artisans_info = json_decode($getcard_artisans_info, true);
+                   $today = date('Y-m-d H:i:s');
+                   if($getcard_artisans_info['error_code'] === 0 
+                        && $getcard_artisans_info['data']['card']['start_time'] < $today
+                        //&& $getcard_artisans_info['data']['card']['end_time'] > $today
+                        && $getcard_artisans_info['data']['card']['state'] == 100
+                        //&& $getcard_artisans_info['data']['card_codes'][0]['cost_count']==="0") {
+                        ) {
+                              $cardinfo['cash'] =  $getcard_artisans_info['data']['card']['reduce_cose'];
+                              $cardinfo['id']   =  $getcard_artisans_info['data']['card_codes'][0]['card_id'];
+                              $cardinfo['name'] =  $getcard_artisans_info['data']['card']['title'];
+                              if($getcard_artisans_info['data']['card_codes'][0]['cost_count']>0) {
+                                    $cardinfo['status'] = 1;      //已使用
+                              }elseif($getcard_artisans_info['data']['card']['end_time']<$today) {
+                                    $cardinfo['status'] = 2;      //已过期
+                              }else{
+                                    $cardinfo['status'] = 0;
+                              }
+                              $cardinfo['daytime'] = $getcard_artisans_info['data']['card']['end_time'];
+                              $cardinfo['daytime'] = date('Y-m-d', strtotime($cardinfo['daytime']));
+                              $cardinfo['last']    = (int)floor((strtotime($cardinfo['daytime'])-time())/86400);
+                              $cardinfo['range']   = $cardid==81?'XXXX/XXXX':$getcard_artisans_info['data']['card']['sub_title'];
+                              $cardinfo['pram']    = '&cardid='.$cardinfo['id'].'&codeid='.$getcard_artisans_info['data']['card_codes'][0]['id'];
+                              return $cardinfo;
+                        }
+             }
+             return false;
+      }
 }
