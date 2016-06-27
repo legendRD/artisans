@@ -383,7 +383,7 @@ class PayApiModel extends Model {
 	       wlog($app_url, $ret);
 	 }
 	 
-	 //释放产能
+	 //释放XX
 	public function releaseCapacity($capacity_id){
   		if(!$capacity_id) return false;
   		$data	= array(
