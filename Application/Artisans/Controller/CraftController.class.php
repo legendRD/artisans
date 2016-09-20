@@ -754,7 +754,7 @@ class CraftController extends CommonController {
              $this->assign('ProductInfo', $ProductInfo['data']);
              $this->assign('CraftsInfo', $CraftsInfo['data']);
              $this->assign('pageHome','craftDetail');
-             $this->assign('pagename','XXXXX-手艺人信息页');
+             $this->assign('pagename','XXXXX-XXX信息页');
             
              $this->display('qcs_detail');
       }
@@ -873,7 +873,7 @@ class CraftController extends CommonController {
       
       public function capacityByuserIdDate() {
       	     $postData=I('post.');
-    	     $param['CraftsmanId']=$postData['userId']; //手艺人id
+    	     $param['CraftsmanId']=$postData['userId']; //XXXid
     	     $param['Date']=$postData['time'];   //日期
     	     $param['ProductId']=$postData['productId'];   //日期
 
@@ -964,7 +964,7 @@ class CraftController extends CommonController {
         
         public function getEvaluationList() {
         	$postData = I('post.');
-        	$param['CraftsmanId'] = $postData['userId'];	//手艺人id
+        	$param['CraftsmanId'] = $postData['userId'];	//XXXid
         	$param['page']        = $postData['page'];
         	$param['limit']       = $postData['limit'];
         	$data = A('Api')->getEvaluationList($param);
@@ -1250,7 +1250,7 @@ class CraftController extends CommonController {
 				}
 			}else{
 				$return['status']=505;
-				$return['msg']='您选择的服务地点未开通手艺人服务';
+				$return['msg']='您选择的服务地点未开通XXX服务';
 			}
         	}else{
         		$return['status']=300;
@@ -1340,7 +1340,7 @@ class CraftController extends CommonController {
         		send_curl('http://localhost/message/send_wxmsg', $set);
         		$param['openid']	=  $data['open_id'];
 			$param['msgtype']	= 'text';
-			$param['message']	= "欢迎体验XXX服务，正在为您接通手艺人客服，请稍等";
+			$param['message']	= "欢迎体验XXX服务，正在为您接通XXX客服，请稍等";
         	}
         	return json_encode($return);	
         }
